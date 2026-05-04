@@ -38,8 +38,6 @@ const DEFAULT_CONFIG = {
 function getArgs(req, id, extra = {}) {
     let userConfig = DEFAULT_CONFIG;
     
-    // Check if config is passed in the path (e.g. /hanime/{config}/...)
-    // This is how Stremio sends it if configured
     const pathParts = req.originalUrl.split('/');
     const configPart = pathParts.find(p => p.startsWith('%7B') || p.startsWith('{'));
     
@@ -57,6 +55,30 @@ function getArgs(req, id, extra = {}) {
         config: userConfig,
         extra: extra
     };
+}
+
+/**
+ * Helper to fix local URLs returned by the addon (e.g. 10.x.x.x or localhost)
+ * to point to our proxy instead.
+ */
+function fixUrls(item) {
+    if (!item) return item;
+    
+    const rewrite = (url) => {
+        if (!url || typeof url !== 'string') return url;
+        if (url.includes(':10000/') || url.includes('10.25.')) {
+            const parts = url.split(url.includes(':10000/') ? ':10000/' : '10000/');
+            const path = parts[1] || "";
+            return `/hanime-proxy/${path}`;
+        }
+        return url;
+    };
+
+    if (item.poster) item.poster = rewrite(item.poster);
+    if (item.background) item.background = rewrite(item.background);
+    if (item.thumbnail) item.thumbnail = rewrite(item.thumbnail);
+    
+    return item;
 }
 
 // --- Routes ---
@@ -87,10 +109,13 @@ router.get([
         
         // Ensure metas have the correct source info for X-STREAM UI
         if (result && result.metas) {
-            result.metas = result.metas.map(m => ({
-                ...m,
-                _source: { id: 'hanime', name: 'Hanime', type: 'anime' }
-            }));
+            result.metas = result.metas.map(m => {
+                const fixed = fixUrls(m);
+                return {
+                    ...fixed,
+                    _source: { id: 'hanime', name: 'Hanime', type: 'anime' }
+                };
+            });
         }
         
         res.json(result);
@@ -108,6 +133,7 @@ router.get('/meta/:type/:id.json', async (req, res) => {
         const result = await metaHandler.handle(args);
         
         if (result && result.meta) {
+            fixUrls(result.meta);
             result.meta._source = { id: 'hanime', name: 'Hanime', type: 'anime' };
         }
         
