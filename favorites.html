@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta name="referrer" content="no-referrer">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porn Portal | FAVORITES</title>
+    <script src="auth.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="favorites">
+    <header class="modern-header">
+        <div class="header-inner">
+            <div class="brand" onclick="location.href='index.html'">
+                <i class="fa-solid fa-bolt-lightning"></i> X-STREAM<span class="brand-badge">PRO</span>
+            </div>
+
+            <div class="search-bar">
+                <form action="search.html" method="GET">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass search-icon-inner"></i>
+                        <input type="text" name="q" id="searchInput" placeholder="Search millions of videos..."
+                            autocomplete="off">
+                        <select name="type" id="searchType">
+                            <option value="real">Real Life</option>
+                            <option value="anime">Anime</option>
+                        </select>
+                        <div id="search-suggestions" class="search-suggestions"></div>
+                    </div>
+                </form>
+            </div>
+
+            <nav class="nav-links">
+                <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i> <span>Home</span></a>
+                <a href="real.html" class="nav-item"><i class="fa-solid fa-clapperboard"></i> <span>Videos</span></a>
+                <a href="anime.html" class="nav-item"><i class="fa-solid fa-tv"></i> <span>Hentai</span></a>
+                <a href="favorites.html" class="nav-item active"><i class="fa-solid fa-heart"></i>
+                    <span>Favorites</span></a>
+                <a href="#" onclick="handleLogout()" class="nav-item nav-item-logout"><i
+                        class="fa-solid fa-right-from-bracket"></i> <span>Logout</span></a>
+            </nav>
+        </div>
+    </header>
+    <main>
+        <div id="home-section">
+            <h2 class="section-title"><i class="fa-solid fa-heart section-icon"></i> My Favorites</h2>
+
+            <div class="favorites-filters">
+                <div class="category-tabs">
+                    <button class="tab-btn active" data-type="real">Real Life</button>
+                    <button class="tab-btn" data-type="anime">Anime</button>
+                </div>
+                <div id="fav-source-filters" class="source-bar">
+                    <!-- Source buttons will be injected here -->
+                </div>
+            </div>
+
+            <div class="grid" id="mainGrid"></div>
+            <div id="sentinel"></div>
+        </div>
+    </main>
+
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

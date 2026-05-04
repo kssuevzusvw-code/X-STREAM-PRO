@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta name="referrer" content="no-referrer">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-STREAM | HENTAI</title>
+    <script src="auth.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="anime">
+    <header class="modern-header">
+        <div class="header-inner">
+            <div class="brand" onclick="location.href='index.html'">
+                <i class="fa-solid fa-bolt-lightning"></i> X-STREAM<span class="brand-badge">PRO</span>
+            </div>
+
+            <div class="search-bar">
+                <form action="search.html" method="GET">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass search-icon-inner"></i>
+                        <input type="text" name="q" id="searchInput" placeholder="Search millions of videos..."
+                            autocomplete="off">
+                        <select name="type" id="searchType">
+                            <option value="real">Real Life</option>
+                            <option value="anime">Anime</option>
+                        </select>
+                        <div id="search-suggestions" class="search-suggestions"></div>
+                    </div>
+                </form>
+            </div>
+
+            <nav class="nav-links">
+                <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i> <span>Home</span></a>
+                <a href="real.html" class="nav-item"><i class="fa-solid fa-clapperboard"></i> <span>Videos</span></a>
+                <a href="anime.html" class="nav-item active"><i class="fa-solid fa-tv"></i> <span>Hentai</span></a>
+                <a href="favorites.html" class="nav-item"><i class="fa-solid fa-heart"></i> <span>Favorites</span></a>
+                <a href="#" onclick="handleLogout()" class="nav-item nav-item-logout"><i
+                        class="fa-solid fa-right-from-bracket"></i> <span>Logout</span></a>
+            </nav>
+        </div>
+    </header>
+    <main>
+        <div id="home-section">
+            <h2 class="section-title">Trending Hentai</h2>
+
+            <!-- Source Filter -->
+            <div class="genre-bar" id="source-bar"
+                style="display:flex; gap:10px; overflow-x:auto; padding-bottom:15px; scrollbar-width:none; -webkit-overflow-scrolling:touch; margin-top: 20px;">
+                <!-- Sources injected by JS -->
+            </div>
+
+            <div class="grid vertical-grid" id="mainGrid"></div>
+            <div id="sentinel"
+                style="height: 100px; display: flex; align-items: center; justify-content: center; width: 100%;"></div>
+        </div>
+    </main>
+    <!-- Player Overlay for Inline Watching -->
+    <div id="player-overlay" class="player-view">
+        <header class="player-header">
+            <div class="brand">Porn Portal</div>
+            <div class="player-video-title" id="overlay-title">Loading...</div>
+            <button class="close-btn" onclick="closePlayer()">×</button>
+        </header>
+
+        <div class="movie-info">
+            <div class="player-container">
+                <video id="player" controls playsinline></video>
+                <!-- Seek Icons for Double Click -->
+                <div id="icon-backward" class="seek-icon left">
+                    <div class="seek-ripple"></div>
+                    <div class="seek-text"><svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                            <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
+                        </svg><span>5</span>s</div>
+                </div>
+                <div id="icon-forward" class="seek-icon right">
+                    <div class="seek-ripple"></div>
+                    <div class="seek-text"><svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                            <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
+                        </svg><span>5</span>s</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h1 class="movie-title" id="info-title">Video Title</h1>
+                <div style="display:flex; gap:10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <span class="card-source" id="overlay-badge">SOURCE</span>
+                </div>
+                <p class="movie-desc" id="info-desc">Description...</p>
+
+                <div style="display:flex; gap: 10px; flex-wrap: wrap; margin-top: 20px;">
+                    <button id="btn-watch-favorite" class="btn-secondary"
+                        style="background: rgba(255, 255, 255, 0.05);"><i class="fa-regular fa-heart"></i>
+                        Favorite</button>
+                    <a href="#" target="_blank" id="btn-new-tab" class="btn-secondary" style="display: none;"><i
+                            class="fa-solid fa-up-right-from-square"></i> External
+                        Player</a>
+                    <a href="#" target="_blank" id="btn-external-source" class="btn-secondary"
+                        style="background: rgba(255, 153, 0, 0.15); border-color: rgba(255, 153, 0, 0.3);"><i
+                            class="fa-solid fa-globe"></i> Open
+                        Website</a>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem;">
+                <h3 class="section-title">Available Streams</h3>
+                <div id="source-list" class="streams-list"></div>
+            </div>
+
+            <div id="episodes-section" style="display:none; margin-top: 2rem;">
+                <h3 class="section-title">Episodes</h3>
+                <div id="episodes-list" class="episodes-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

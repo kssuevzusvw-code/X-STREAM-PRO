@@ -1,0 +1,161 @@
+/**
+ * Centralized configuration for Hanime Stremio Addon
+ * All environment variables and configuration constants are defined here
+ */
+
+const packageJson = require('../package.json');
+
+const config = {
+  server: {
+    port: parseInt(process.env.PORT, 10) || 57888,
+    publicUrl: process.env.PUBLIC_URL || null, // Will be set at runtime if not provided
+    env: process.env.NODE_ENV || 'development'
+  },
+
+  api: {
+    authority: 'hanime.tv',
+    defaultAuthority: 'hw.hanime.tv',
+    manifestAuthority: 'cached.freeanimehentai.net',
+    searchUrl: 'https://search.htv-services.com/',
+    cdnUrl: 'https://hanime-cdn.com'
+  },
+
+  cache: {
+    enabled: process.env.CACHE_ENABLED !== 'false', // Enable in-memory cache (default: true)
+    maxSize: process.env.CACHE_MAX_SIZE ? (parseInt(process.env.CACHE_MAX_SIZE, 10) || 5000) : 5000, // Maximum number of cache entries (default: 5000)
+    browserCache: (process.env.CACHE_BROWSER_CACHE !== undefined ? process.env.CACHE_BROWSER_CACHE !== 'false' : process.env.BROWSER_CACHE !== 'false'), // Enable browser caching (default: true, supports CACHE_BROWSER_CACHE and BROWSER_CACHE for backward compatibility)
+    redisUrl: process.env.CACHE_REDIS_URL || process.env.REDIS_URL || null, // Redis connection URL for persistent cache (optional)
+    ttl: {
+      catalog: 2 * 60 * 60, // 2 hours in seconds
+      meta: 36 * 60 * 60, // 1.5 days in seconds
+      stream: 36 * 60 * 60, // 1.5 days in seconds
+      image: 30 // 30 seconds
+    },
+    browserCacheMaxAge: 86400, // 24 hours in seconds for browser cache headers
+    imageProxy: {
+      queueDelay: parseInt(process.env.IMAGE_PROXY_QUEUE_DELAY, 10) || 100, // Delay between queued requests in ms (default: 100ms)
+      enabled: process.env.IMAGE_PROXY_QUEUE !== 'false' // Enable request queue (default: true)
+    }
+  },
+
+  logging: {
+    level: process.env.LOG_LEVEL || 'debug', // debug, info, warn, error, silent
+    enabled: process.env.LOGGING_ENABLED !== 'false' // Enable logging (default: true)
+  },
+
+  rateLimit: {
+    enabled: process.env.RATE_LIMIT_ENABLED !== 'false', // Enable rate limiting (default: true)
+    useRedisStore: process.env.RATE_LIMIT_USE_REDIS === 'true', // Use Redis store for rate limiting (default: false)
+    // General API rate limit (for Stremio addon endpoints)
+    // Set higher than slow-down delayAfter to allow legitimate browsing
+    // Users browsing catalogs can generate many requests, so we're generous
+    general: {
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
+      max: 5000, // Significantly increased for local use
+      message: 'Too many requests from this IP, please try again later.',
+      standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+      legacyHeaders: false // Disable `X-RateLimit-*` headers
+    },
+    // Stricter limit for image proxy (more resource-intensive)
+    // Still higher than slow-down to allow some burst before blocking
+    imageProxy: {
+      windowMs: parseInt(process.env.RATE_LIMIT_IMAGE_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
+      max: 2000, // Increased for smooth browsing
+      message: 'Too many image proxy requests from this IP, please try again later.',
+      standardHeaders: true,
+      legacyHeaders: false
+    }
+  },
+
+  slowDown: {
+    enabled: false, // Disabled for maximum speed
+    useRedisStore: process.env.SLOW_DOWN_USE_REDIS === 'true', // Use Redis store for slow-down (default: false)
+    // General API slow-down (for Stremio addon endpoints)
+    // Less restrictive: starts closer to rate limit to allow more normal usage
+    // Strategy: Start slowing at 150, rate limit at 200 (smaller gap, less aggressive)
+    general: {
+      windowMs: parseInt(process.env.SLOW_DOWN_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
+      delayAfter: parseInt(process.env.SLOW_DOWN_DELAY_AFTER, 10) || 800, // Start slowing down after 800 requests
+      delayMs: parseInt(process.env.SLOW_DOWN_DELAY_MS, 10) || 200, // Add 200ms delay per request after threshold (gentle)
+      maxDelayMs: parseInt(process.env.SLOW_DOWN_MAX_DELAY_MS, 10) || 2000 // Maximum delay of 2 seconds (before rate limit kicks in)
+    },
+    // Less restrictive slow-down for image proxy (more resource-intensive)
+    // Starts closer to rate limit to allow more normal usage
+    // Strategy: Start slowing at 400, rate limit at 500
+    imageProxy: {
+      windowMs: parseInt(process.env.SLOW_DOWN_IMAGE_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
+      delayAfter: parseInt(process.env.SLOW_DOWN_IMAGE_DELAY_AFTER, 10) || 400, // Start slowing down after 400 requests
+      delayMs: parseInt(process.env.SLOW_DOWN_IMAGE_DELAY_MS, 10) || 300, // Add 300ms delay per request after threshold
+      maxDelayMs: parseInt(process.env.SLOW_DOWN_IMAGE_MAX_DELAY_MS, 10) || 3000 // Maximum delay of 3 seconds (before rate limit)
+    }
+  },
+
+  pagination: {
+    itemsPerPage: 48
+  },
+
+  addon: {
+    id: process.env.ADDON_ID || 'hanime-addon',
+    version: process.env.ADDON_VERSION || packageJson.version, // Env variable or package.json
+    name: process.env.ADDON_NAME || 'Hanime',
+    icon: process.env.ADDON_ICON || '/images/favicon.ico', // Relative path
+    logo: process.env.ADDON_LOGO || '/images/logo.jpg', // Relative path
+    background: process.env.ADDON_BACKGROUND || '/images/background.jpg', // Relative path
+    description: process.env.ADDON_DESCRIPTION || 'Enjoy your unlimited hentai & anime collection. We are the definitive source for the best curated 720p / 1080p HD hentai videos for free.',
+    // Stremio Addons Config (optional)
+    stremioAddonsConfig: (() => {
+      const issuer = process.env.STREMIO_ADDONS_ISSUER;
+      const signature = process.env.STREMIO_ADDONS_SIGNATURE;
+      return (issuer && signature) ? { issuer, signature } : null;
+    })()
+  }
+};
+
+const os = require('os');
+
+/**
+ * Get the local IP address of the server
+ * @returns {string} The local IPv4 address or 127.0.0.1
+ */
+function getLocalIp() {
+  const interfaces = os.networkInterfaces();
+  let backupIp = '127.0.0.1';
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        if (iface.address.startsWith('192.168.')) {
+          return iface.address;
+        }
+        backupIp = iface.address;
+      }
+    }
+  }
+  return backupIp;
+}
+
+/**
+ * Get the public URL (computed at runtime if not set via env)
+ * @returns {string} Public URL
+ */
+function getPublicUrl() {
+  if (config.server.publicUrl) {
+    return config.server.publicUrl;
+  }
+  const localIp = getLocalIp();
+  return `http://${localIp}:${config.server.port}`;
+}
+
+/**
+ * Build full URL from relative path
+ * @param {string} relativePath - Relative path (e.g., '/images/logo.jpg')
+ * @returns {string} Full URL
+ */
+function buildFullUrl(relativePath) {
+  if (!relativePath) return '';
+  if (relativePath.startsWith('http')) return relativePath; // Already full URL
+  return `${getPublicUrl()}${relativePath}`;
+}
+
+module.exports = config;
+module.exports.getPublicUrl = getPublicUrl;
+module.exports.buildFullUrl = buildFullUrl;

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-STREAM | Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="auth.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --bg: #030712;
+            --surface: #0f172a;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: white;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .brand {
+            font-size: 24px;
+            font-weight: 800;
+        }
+
+        .brand i { color: var(--primary); }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            text-align: left;
+            padding: 16px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .user-email { font-weight: 600; }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-active { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .status-expired { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover { background: var(--primary); border-color: var(--primary); }
+
+        .days-input {
+            width: 60px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 6px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand">
+                <i class="fa-solid fa-bolt-lightning"></i> X-STREAM Admin
+            </div>
+            <div class="header-actions" style="display: flex; gap: 10px;">
+                <button onclick="location.href='index.html'">Back to Home</button>
+                <button onclick="handleLogout()" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #ef4444;">Logout</button>
+            </div>
+        </header>
+
+        <div class="card">
+            <h2>Manage User Subscriptions</h2>
+            <div id="loading">Checking permissions...</div>
+            <table id="user-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Expiry Date</th>
+                        <th>Status</th>
+                        <th>Add Days</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="user-list">
+                    <!-- Users injected here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Wait for auth.js to initialize
+        async function loadUsers() {
+            // Check if user is admin
+            if (!window.userProfile || !window.userProfile.is_admin) {
+                // Wait a bit if profile is still loading
+                if (!window.userProfile) {
+                    setTimeout(loadUsers, 500);
+                    return;
+                }
+                document.body.innerHTML = '<h1 style="text-align:center; margin-top:100px;">Access Denied. Admins Only.</h1>';
+                return;
+            }
+
+            document.getElementById('loading').textContent = 'Loading users...';
+
+            const { data: users, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('user-table').style.display = 'table';
+
+            const list = document.getElementById('user-list');
+            list.innerHTML = '';
+
+            users.forEach(user => {
+                const expiry = new Date(user.subscription_end);
+                const isActive = expiry > new Date();
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="user-email">${user.email} ${user.is_admin ? '⭐' : ''}</td>
+                    <td>${expiry.toLocaleDateString()}</td>
+                    <td>
+                        <span class="status-badge ${isActive ? 'status-active' : 'status-expired'}">
+                            ${isActive ? 'Active' : 'Expired'}
+                        </span>
+                    </td>
+                    <td>
+                        <input type="number" class="days-input" id="days-${user.id}" value="30">
+                    </td>
+                    <td class="actions">
+                        <button onclick="updateSub('${user.id}', 'add')">Extend</button>
+                        <button onclick="updateSub('${user.id}', 'set')" style="opacity: 0.5;">Set New</button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+        }
+
+        async function updateSub(userId, mode) {
+            const days = parseInt(document.getElementById(`days-${userId}`).value);
+            if (isNaN(days)) return;
+
+            // Get current expiry or now
+            const { data: user } = await supabaseClient.from('profiles').select('subscription_end').eq('id', userId).single();
+            let currentExpiry = new Date(user.subscription_end);
+            if (currentExpiry < new Date()) currentExpiry = new Date();
+
+            let newExpiry;
+            if (mode === 'add') {
+                newExpiry = new Date(currentExpiry.getTime() + days * 24 * 60 * 60 * 1000);
+            } else {
+                newExpiry = new Date(new Date().getTime() + days * 24 * 60 * 60 * 1000);
+            }
+
+            const { error } = await supabaseClient
+                .from('profiles')
+                .update({ subscription_end: newExpiry.toISOString() })
+                .eq('id', userId);
+
+            if (error) {
+                alert('Error updating subscription: ' + error.message);
+            } else {
+                alert('Subscription updated successfully!');
+                loadUsers();
+            }
+        }
+
+        // Delay start to allow auth.js to finish
+        setTimeout(loadUsers, 1000);
+    </script>
+</body>
+</html>

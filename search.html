@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta name="referrer" content="no-referrer">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="description" content="Porn Portal - Search adult videos">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>Porn Portal</title>
+    <script src="auth.js"></script>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+</head>
+
+<body data-page="search">
+    <header class="modern-header">
+        <div class="header-inner">
+            <div class="brand" onclick="location.href='index.html'">
+                <i class="fa-solid fa-bolt-lightning"></i> X-STREAM<span class="brand-badge">PRO</span>
+            </div>
+
+            <div class="search-bar">
+                <form action="search.html" method="GET">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass search-icon-inner"></i>
+                        <input type="text" name="q" id="searchInput" placeholder="Search millions of videos..."
+                            autocomplete="off">
+                        <select name="type" id="searchType">
+                            <option value="real">Real Life</option>
+                            <option value="anime">Anime</option>
+                        </select>
+                        <div id="search-suggestions" class="search-suggestions"></div>
+                    </div>
+                </form>
+            </div>
+
+            <nav class="nav-links">
+                <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i> <span>Home</span></a>
+                <a href="real.html" class="nav-item"><i class="fa-solid fa-clapperboard"></i> <span>Videos</span></a>
+                <a href="anime.html" class="nav-item"><i class="fa-solid fa-tv"></i> <span>Hentai</span></a>
+                <a href="favorites.html" class="nav-item"><i class="fa-solid fa-heart"></i> <span>Favorites</span></a>
+                <a href="#" onclick="handleLogout()" class="nav-item nav-item-logout"><i
+                        class="fa-solid fa-right-from-bracket"></i> <span>Logout</span></a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div id="home-section">
+            <h2 class="section-title"><i class="fa-solid fa-magnifying-glass section-icon"></i> Search Results</h2>
+            <!-- Source Filter -->
+            <div class="genre-bar" id="source-bar"
+                style="display:flex; gap:10px; overflow-x:auto; padding-bottom:15px; scrollbar-width:none; -webkit-overflow-scrolling:touch; margin-top: 20px;">
+                <!-- Sources injected by JS -->
+            </div>
+            <div class="grid" id="mainGrid">
+                <!-- Cards injected by JS -->
+            </div>
+            <div id="sentinel"
+                style="height: 100px; display: flex; align-items: center; justify-content: center; width: 100%;"></div>
+        </div>
+    </main>
+
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porn Portal</title>
+    <script src="auth.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        #btn-direct-download {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 24px;
+            background: #ff5500 !important;
+            border: none !important;
+            border-radius: 8px !important;
+            color: #ffffff !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            text-decoration: none !important;
+        }
+
+        #btn-direct-download:hover {
+            background: #ff7700 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 119, 0, 0.4) !important;
+        }
+
+        #btn-direct-download i {
+            font-size: 1.1rem !important;
+        }
+
+        /* Server Specific Download Button */
+        .server-dl-btn {
+            background: rgba(255, 85, 0, 0.1) !important;
+            border: 1px solid rgba(255, 85, 0, 0.3) !important;
+            color: #ff5500 !important;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            margin-left: 10px;
+        }
+
+        .server-dl-btn:hover {
+            background: #ff5500 !important;
+            color: #fff !important;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(255, 85, 0, 0.3);
+        }
+
+        .server-dl-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .server-dl-btn i {
+            pointer-events: none;
+        }
+
+        .stream-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .stream-card:hover {
+            border-color: var(--primary) !important;
+            background: rgba(255, 255, 255, 0.03) !important;
+        }
+
+        .quality-dl-mini-btn:hover {
+            opacity: 1 !important;
+            transform: scale(1.2);
+            color: #fff !important;
+        }
+
+        .quality-badge-wrapper {
+            transition: all 0.3s ease;
+        }
+
+        .quality-badge-wrapper:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-5px);
+            }
+
+            75% {
+                transform: translateX(5px);
+            }
+        }
+
+        .qualities-dropdown {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .server-dl-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
+</head>
+
+<body data-page="watch" class="watch-page">
+    <header class="modern-header">
+        <div class="header-inner">
+            <div class="brand" onclick="location.href='index.html'">
+                <i class="fa-solid fa-bolt-lightning"></i> X-STREAM<span class="brand-badge">PRO</span>
+            </div>
+
+            <div class="search-bar">
+                <form action="search.html" method="GET">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass search-icon-inner"></i>
+                        <input type="text" name="q" id="searchInput" placeholder="Search millions of videos..."
+                            autocomplete="off">
+                        <select name="type" id="searchType">
+                            <option value="real">Real Life</option>
+                            <option value="anime">Anime</option>
+                        </select>
+                        <div id="search-suggestions" class="search-suggestions"></div>
+                    </div>
+                </form>
+            </div>
+
+            <nav class="nav-links">
+                <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i> <span>Home</span></a>
+                <a href="real.html" class="nav-item"><i class="fa-solid fa-film"></i> <span>Videos</span></a>
+                <a href="anime.html" class="nav-item"><i class="fa-solid fa-tv"></i> <span>Hentai</span></a>
+                <a href="favorites.html" class="nav-item"><i class="fa-solid fa-heart"></i> <span>Favorites</span></a>
+                <a href="#" onclick="handleLogout()" class="nav-item nav-item-logout"><i
+                        class="fa-solid fa-right-from-bracket"></i> <span>Logout</span></a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="watch-main">
+        <div class="watch-content">
+            <div class="player-column">
+                <div class="player-container" id="artplayer">
+                    <!-- Artplayer will inject the video element and UI here -->
+                </div>
+
+
+                <div class="movie-info">
+                    <div style="display:flex; gap:10px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <span class="card-source" id="overlay-badge">SOURCE</span>
+                    </div>
+                    <h1 class="movie-title" id="info-title"></h1>
+
+                    <div style="display:flex; gap: 10px; flex-wrap: wrap; margin-top: 20px;">
+                        <button id="btn-watch-favorite" class="btn-secondary"
+                            style="background: rgba(255, 255, 255, 0.05);"><i class="fa-regular fa-heart"></i>
+                            Favorite</button>
+                        <a href="#" target="_blank" id="btn-new-tab" class="btn-secondary" style="display: none;"><i
+                                class="fa-solid fa-up-right-from-square"></i> External Player</a>
+                        <a href="#" target="_blank" id="btn-external-source" class="btn-secondary"
+                            style="background: rgba(255, 153, 0, 0.15); border-color: rgba(255, 153, 0, 0.3); display: none;"><i
+                                class="fa-solid fa-globe"></i> Open
+                            Website</a>
+                        <button id="btn-direct-download" class="btn-dl-premium">
+                            <i class="fa-solid fa-download"></i> Download Video
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <aside class="watch-sidebar">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title"><i class="fa-solid fa-signal"></i> Available Streams</h3>
+                    <div id="source-list" class="streams-list">
+                        <!-- Streams will be injected here -->
+                    </div>
+                </div>
+
+                <div id="episodes-section" class="sidebar-section" style="display:none;">
+                    <h3 class="sidebar-title"><i class="fa-solid fa-list-ol"></i> Episodes</h3>
+                    <div id="episodes-list" class="episodes-list">
+                        <!-- Episodes will be injected here -->
+                    </div>
+                </div>
+
+            </aside>
+        </div>
+
+        <div class="row-section" style="margin-top: 4rem;">
+            <h2 class="section-title"><i class="fa-solid fa-layer-group section-icon"></i> Similar Content</h2>
+            <div id="similar-grid" class="grid">
+                <!-- Similar content will be injected here -->
+            </div>
+        </div>
+    </main>
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <script src="script.js"></script>
+
+
+</body>
+
+</html>
