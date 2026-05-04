@@ -4535,10 +4535,10 @@ async function playUrl(url, item = null, useProxy = false, proxyIndex = 0) {
 
             if (dlButton.disabled) return;
 
-            const videoTitle = window.currentWatchItem?.name || 'video';
+            const videoTitle = (window.currentWatchItem ? (window.currentWatchItem.name || window.currentWatchItem.title) : 'video') || 'video';
             const cleanName = videoTitle.replace(/[\\/:*?"<>|]/g, '_');
+            const downloadUrl = `/api/download/direct?url=${encodeURIComponent(targetUrl)}&title=${encodeURIComponent(cleanName)}`;
 
-            const downloadUrl = getDownloadUrl(targetUrl, cleanName);
 
             // UI: Feedback that download is starting
             // dlButton.disabled = true; // REMOVED PER USER REQUEST
