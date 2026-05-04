@@ -1808,8 +1808,8 @@ app.get('/api/ffmpeg-stream', async (req, res) => {
 
 
 // --- 🎌 HANIME ADDON RELAY (Port 57888 -> 3000 Bridge with JSON Rewriting) 🎌 ---
-app.get('/hanime-proxy/(.*)', async (req, res) => {
-    const pathValue = req.params[0];
+app.get('/hanime-proxy/:path*', async (req, res) => {
+    const pathValue = req.params.path;
     const targetUrl = `http://localhost:57888/${pathValue}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
     try {
