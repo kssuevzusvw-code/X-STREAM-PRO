@@ -34,22 +34,22 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
         let url;
         if (query) {
             console.log(`📡 [Porcore Search] GET: q=${query}, p=${pageNum}`);
-            url = `https://porcore.com/?q=${encodeURIComponent(query)}&ajax&p=${pageNum}`;
+            url = `https://porcore.com/?q=${encodeURIComponent(query)}&ajax=true&p=${pageNum}`;
             try {
                 const resp = await axios.get(url, {
                     headers: { 'User-Agent': UA, 'Referer': 'https://porcore.com/', 'X-Requested-With': 'XMLHttpRequest' },
                     timeout: 25000
                 });
                 html = resp.data;
-                if (!html || html.length < 500) {
-                    html = await scraperFetch(url.replace('&ajax', ''), 25000);
+                if (!html || html.length < 200) {
+                    html = await scraperFetch(url.replace('&ajax=true', ''), 25000);
                 }
             } catch (e) {
                 console.warn(`⚠️ [Porcore] Search failed, trying scraperFetch...`);
                 html = await scraperFetch(url, 25000);
             }
         } else {
-            const url = `${baseUrl}?ajax&p=${pageNum}`;
+            const url = `${baseUrl}?ajax=true&p=${pageNum}`;
             console.log(`📡 [Porcore Catalog] Fetching: ${url}`);
             try {
                 const resp = await axios.get(url, {
@@ -66,8 +66,8 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
         let $ = cheerio.load(html);
         const metas = [];
 
-        const items = $('.onevideothumb, .v-item, .video-item, .col-video, .thumb-block').length > 0
-            ? $('.onevideothumb, .v-item, .video-item, .col-video, .thumb-block')
+        const items = $('#videoitems .onevideothumb, #videoitems .v-item, .onevideothumb, .v-item, .video-item, .col-video, .thumb-block').length > 0
+            ? $('#videoitems .onevideothumb, #videoitems .v-item, .onevideothumb, .v-item, .video-item, .col-video, .thumb-block')
             : $('a[href*="/video/"]').closest('div');
 
         items.each((i, el) => {

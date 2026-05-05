@@ -16,14 +16,16 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
 
         let skip = req.params.skip ? parseInt(req.params.skip) : 0;
         let pageNum = Math.floor(skip / 24) + 1;
-
         let url = `https://3dporndude.com/latest-updates/`;
-        if (pageNum > 1) url += `?page=${pageNum}`;
+        if (pageNum > 1) url = `https://3dporndude.com/latest-updates/${pageNum}/`;
 
         if (query) {
             const slug = encodeURIComponent(query.toLowerCase().trim().replace(/\s+/g, '-'));
-            url = `https://3dporndude.com/search/${slug}/`;
-            if (pageNum > 1) url += `?from_videos=${pageNum}`;
+            // Use the AJAX-friendly parameter shown in the site's data-parameters
+            url = `https://3dporndude.com/search/${slug}/?from_videos=${pageNum}`;
+        } else {
+            // For catalog pages, the site also supports ?from_videos=N
+            url = `${url}?from_videos=${pageNum}`;
         }
 
         let html;
@@ -44,30 +46,35 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
             const $el = $(el);
             const $link = $el.find('a[href*="/video/"], a[href*="/v/"], a[href*="/out/"]').first();
             const href = $link.attr('href');
-            const title = $el.find('.title').first().text().trim() || $el.find('h5, h3, .name').text().trim() || $link.attr('title') || $el.find('img').attr('alt');
+                const title = $el.find('.title').first().text().trim() || $link.attr('title') || $el.find('h5, h3, .name').text().trim() || $el.find('img').attr('alt');
+                let poster = $el.find('img').attr('data-webp') || $el.find('img').attr('data-src') || $el.find('img').attr('data-original') || $el.find('img').attr('src');
 
-            let poster = $el.find('img').attr('data-webp') || $el.find('img').attr('data-src') || $el.find('img').attr('data-original') || $el.find('img').attr('src');
+                if (href && title && poster && !poster.includes('clear.gif')) {
+                    let videoUrl = href.startsWith('http') ? href : 'https://3dporndude.com' + (href.startsWith('/') ? '' : '/') + href;
+                    const encId = Buffer.from(videoUrl).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
-            if (href && title && poster && !poster.includes('clear.gif')) {
-                let videoUrl = href.startsWith('http') ? href : 'https://3dporndude.com' + (href.startsWith('/') ? '' : '/') + href;
-                const encId = Buffer.from(videoUrl).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+                    if (poster.startsWith('/')) poster = 'https://3dporndude.com' + poster;
 
-                if (poster.startsWith('/')) poster = 'https://3dporndude.com' + poster;
+                    // Improved duration extraction
+                    const durationRaw = $el.find('.time, .duration, .video-duration').first().text().trim();
+                    const duration = durationRaw ? durationRaw.match(/\d+[\d:]+/) ? durationRaw.match(/\d+[\d:]+/)[0] : durationRaw : "";
+                    
+                    // Optional: fetch quality if available
+                    const quality = $el.find('.qualtiy, .quality').text().trim();
+                    const finalName = quality ? `[${quality}] ${title}` : title;
 
-                const durationRaw = $el.find('.duration, .time, .video-duration').first().text().trim();
-                const duration = durationRaw.match(/\d+[\d:]+/) ? durationRaw.match(/\d+[\d:]+/)[0] : durationRaw.split(/\s+/)[0];
-                const preview = $el.find('video source').attr('src') || $el.find('video').attr('src') || $el.attr('data-video-preview') || "";
+                    const preview = $el.find('video source').attr('src') || $el.find('video').attr('src') || $el.attr('data-video-preview') || "";
 
-                metas.push({
-                    id: `3dporndude_${encId}`,
-                    type: 'movie',
-                    name: title.replace(/&amp;/g, '&').replace(/<[^>]+>/g, '').trim(),
-                    poster: poster,
-                    posterShape: 'landscape',
-                    duration: duration,
-                    preview: preview
-                });
-            }
+                    metas.push({
+                        id: `3dporndude_${encId}`,
+                        type: 'movie',
+                        name: finalName.replace(/&amp;/g, '&').replace(/<[^>]+>/g, '').trim(),
+                        poster: poster,
+                        posterShape: 'landscape',
+                        duration: duration,
+                        preview: preview
+                    });
+                }
         });
 
         if (metas.length === 0) {

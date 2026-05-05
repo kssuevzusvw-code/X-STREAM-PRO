@@ -117,6 +117,65 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- 🎌 HANIME ADDON RELAY (NATIVE PROXY) 🎌 ---
+const hanimeAddonPath = path.join(__dirname, 'hanime-stremio-main');
+const hanimeConfig = require(path.join(hanimeAddonPath, 'lib', 'config'));
+const HanimeApiClient = require(path.join(hanimeAddonPath, 'lib', 'clients', 'hanime_api_client'));
+const createImageProxyMiddleware = require(path.join(hanimeAddonPath, 'lib', 'middleware', 'proxy_image_middleware'));
+
+const hanimeApiClient = new HanimeApiClient(hanimeConfig);
+const hanimeProxy = createImageProxyMiddleware(hanimeConfig, hanimeApiClient);
+
+// Use wildcard to capture EVERYTHING and parse manually to avoid Express param issues with hyphens/colons
+app.use('/hanime-proxy/proxy/image/*', (req, res, next) => {
+    const fullPath = req.params[0]; // This captures everything after 'image/'
+    const parts = fullPath.split('/');
+    
+    if (parts.length >= 2) {
+        // Detect which part is the type (poster/background/etc) and which is the ID
+        const knownTypes = ['poster', 'background', 'thumbnail', 'logo', 'cover'];
+        let type, id;
+        
+        if (knownTypes.includes(parts[0].toLowerCase())) {
+            type = parts[0];
+            id = decodeURIComponent(parts[1]);
+        } else if (knownTypes.includes(parts[1].toLowerCase())) {
+            id = decodeURIComponent(parts[0]);
+            type = parts[1];
+        } else {
+            // Fallback to original assumption
+            type = parts[0];
+            id = decodeURIComponent(parts[1]);
+        }
+
+        req.params.type = type;
+        req.params.id = id;
+        console.log(`🖼️ [Hanime Smart Proxy] Detected Type: ${type} | ID: ${id}`);
+        return hanimeProxy(req, res);
+    }
+    next();
+});
+
+// Fallback for other hanime-proxy requests
+app.use('/hanime-proxy', (req, res, next) => {
+    if (req.url.includes('/proxy/image/')) {
+        const fullPath = req.url.split('/proxy/image/')[1];
+        const parts = fullPath.split('?')[0].split('/');
+        if (parts.length >= 2) {
+            const knownTypes = ['poster', 'background', 'thumbnail', 'logo', 'cover'];
+            if (knownTypes.includes(parts[0].toLowerCase())) {
+                req.params.type = parts[0];
+                req.params.id = decodeURIComponent(parts[1]);
+            } else {
+                req.params.id = decodeURIComponent(parts[0]);
+                req.params.type = parts[1];
+            }
+            return hanimeProxy(req, res);
+        }
+    }
+    res.status(404).send('Not Found');
+});
+
 
 const downloadsDir = path.join(__dirname, 'downloads');
 if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir);
@@ -337,7 +396,9 @@ function saveFavorites(favs) {
 }
 
 app.get('/api/favorites', (req, res) => {
-    const favs = getFavorites();
+    let favs = getFavorites();
+    // Sort by timestamp descending (newest first)
+    favs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     res.json(favs.map(item => wrapGlobalMedia(item)));
 });
 
@@ -1101,6 +1162,21 @@ app.get('/api/proxy', async (req, res) => {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
             }
         });
+        // Fix and proxy Hanime streams specifically if they escaped earlier proxying
+        if (source === 'hanime' && response.data && response.data.streams) {
+            response.data.streams = response.data.streams.map(s => {
+                if (s.url && !s.url.includes('/api/m3u8-proxy') && !s.url.includes('/api/stream')) {
+                    const isM3U8 = s.url.includes('.m3u8');
+                    const proxyPath = isM3U8 ? '/api/m3u8-proxy' : '/api/stream';
+                    s.url = `${proxyPath}?url=${encodeURIComponent(s.url)}&headers=${encodeURIComponent(JSON.stringify({
+                        'Referer': 'https://hanime.tv/',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }))}`;
+                }
+                return s;
+            });
+        }
+
         res.json(response.data);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1193,21 +1269,25 @@ app.get('/api/search', async (req, res) => {
 
     // 1. Filter sources by type and ID - Targeted List for "All Sources"
     let activeSources = SEARCH_SOURCES;
-    if (source !== 'all') {
-        activeSources = SEARCH_SOURCES.filter(s => s.id === source);
-    } else {
-        if (resolvedType === 'real') {
-            // Specific list requested for All Sources
-            const allowedIds = ['eporner', 'xvideos', 'pornhub', 'xnxx', '3dporndude', 'porcore', 'xhamster', 'missav', 'hqporner'];
-            activeSources = SEARCH_SOURCES.filter(s => allowedIds.includes(s.id));
-        } else if (resolvedType === 'anime') {
-            activeSources = SEARCH_SOURCES.filter(s => s.id === 'hanime');
-        }
-    }
 
-    // 1.1 Strict Blocking for Cross-Category mismatch
+    // 🛡️ [Strict Category Lock] Enforce category separation regardless of specific source selection
     if (resolvedType === 'real') {
-        activeSources = activeSources.filter(s => s.id !== 'hanime');
+        // Only allow real sources, and explicitly block Hanime
+        activeSources = SEARCH_SOURCES.filter(s => s.type === 'real' && s.id !== 'hanime');
+        if (source !== 'all' && !activeSources.some(s => s.id === source)) {
+            // Source mismatch, return empty results
+            return res.json({ results: [], total: 0 });
+        }
+        if (source !== 'all') activeSources = activeSources.filter(s => s.id === source);
+    } else if (resolvedType === 'anime') {
+        // ONLY allow Hanime for anime search
+        activeSources = SEARCH_SOURCES.filter(s => s.id === 'hanime');
+        if (source !== 'all' && source !== 'hanime') {
+            // Source mismatch, return empty results
+            return res.json({ results: [], total: 0 });
+        }
+    } else if (source !== 'all') {
+        activeSources = SEARCH_SOURCES.filter(s => s.id === source);
     }
 
     const fetchTasks = [];
@@ -1221,7 +1301,7 @@ app.get('/api/search', async (req, res) => {
             if (src.id === 'hanime' && cat === 'hanime-series') types = ['series'];
 
             for (const t of types) {
-                const baseSkip = parseInt(skip);
+                const baseSkip = parseInt(skip) || 0;
                 const sep = src.id === 'hanime' ? '&' : '/';
 
                 // --- 🌪️ INTELLIGENT MIXED SORT LOGIC ---
@@ -1233,12 +1313,9 @@ app.get('/api/search', async (req, res) => {
                         fetchTasks.push({ url, src, isSearch: true, mixGroup: s });
                     });
                 } else {
-                    // Standard single-sort fetch
-                    const searchUrls = [
-                        `${cleanBase}/catalog/${t}/${encodeURIComponent(cat)}/search=${encodeURIComponent(normalizedQuery)}${sep}skip=${baseSkip}${src.id === 'pornhub' ? `&sort=${sort}` : ''}.json`,
-                        `${cleanBase}/catalog/${t}/${encodeURIComponent(cat)}/search=${encodeURIComponent(normalizedQuery)}${sep}skip=${baseSkip + 30}${src.id === 'pornhub' ? `&sort=${sort}` : ''}.json`
-                    ];
-                    searchUrls.forEach(url => fetchTasks.push({ url, src, isSearch: true }));
+                    // Standard single-sort fetch - Fetch exactly one page to prevent frontend deduplication issues
+                    const searchUrl = `${cleanBase}/catalog/${t}/${encodeURIComponent(cat)}/search=${encodeURIComponent(normalizedQuery)}${sep}skip=${baseSkip}${src.id === 'pornhub' ? `&sort=${sort}` : ''}.json`;
+                    fetchTasks.push({ url: searchUrl, src, isSearch: true });
                 }
             }
         }
@@ -1446,6 +1523,16 @@ app.get('/api/m3u8-proxy', async (req, res) => {
         'Pragma': 'no-cache'
     };
 
+    // 🛡️ [Dynamic Headers] Parse and merge custom headers if provided
+    if (req.query.headers) {
+        try {
+            const customHeaders = JSON.parse(decodeURIComponent(req.query.headers));
+            Object.assign(headers, customHeaders);
+        } catch (e) {
+            console.warn(`⚠️ [M3U8 Proxy] Failed to parse custom headers: ${e.message}`);
+        }
+    }
+
     // Only add Sec-Fetch if NOT Eporner
     if (!urlLower.includes('eporner')) {
         headers['Sec-Fetch-Dest'] = 'empty';
@@ -1485,7 +1572,7 @@ app.get('/api/m3u8-proxy', async (req, res) => {
         if (!req.query.referer) req.query.referer = 'https://3dporndude.com/';
     } else if (urlLower.includes('porcore')) {
         headers['Referer'] = 'https://porcore.com/';
-    } else if (urlLower.includes('hanime') || urlLower.includes('htv-services') || urlLower.includes('streamable.cloud') || urlLower.includes('mcloud.to') || urlLower.includes('cloudvideo') || urlLower.includes('highwinds-cdn.com')) {
+    } else if (urlLower.includes('hanime') || urlLower.includes('htv-') || urlLower.includes('streamable.cloud') || urlLower.includes('mcloud.to') || urlLower.includes('cloudvideo') || urlLower.includes('highwinds-cdn.com')) {
         headers['Referer'] = 'https://hanime.tv/';
         headers['Origin'] = 'https://hanime.tv';
     } else if (urlLower.includes('teenxy') || urlLower.includes('ahvcdn')) {
@@ -1547,6 +1634,9 @@ app.get('/api/m3u8-proxy', async (req, res) => {
                 }
                 if (req.query.origin && !targetUrl.includes('origin=')) {
                     queryParams.push(`origin=${encodeURIComponent(req.query.origin)}`);
+                }
+                if (req.query.headers) {
+                    queryParams.push(`headers=${encodeURIComponent(req.query.headers)}`);
                 }
                 const extraParams = queryParams.length > 0 ? '&' + queryParams.join('&') : '';
 
@@ -1807,53 +1897,23 @@ app.get('/api/ffmpeg-stream', async (req, res) => {
 });
 
 
-// --- 🎌 HANIME ADDON RELAY (Port 57888 -> 3000 Bridge with JSON Rewriting) 🎌 ---
-app.get('/hanime-proxy/*path', async (req, res) => {
-    const pathValue = req.params.path;
-    const targetUrl = `http://localhost:57888/${pathValue}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
-    try {
-        console.log(`📡 [Hanime Relay] Intercepting: ${targetUrl}`);
-        const response = await axios({
-            method: 'get',
-            url: targetUrl,
-            responseType: pathValue.endsWith('.json') ? 'json' : 'stream',
-            timeout: 25000,
-            validateStatus: false
-        });
-
-        res.status(response.status);
-
-        if (pathValue.endsWith('.json')) {
-            // 🧠 SMART REWRITE: Scan JSON and replace all addon URLs with proxy ones
-            let bodyStr = JSON.stringify(response.data);
-            const addonRegex = /http:\/\/[^/:]+:57888\//g;
-            bodyStr = bodyStr.replace(addonRegex, `${SERVER_BASE}/hanime-proxy/`);
-
-            res.set('Content-Type', 'application/json');
-            return res.send(bodyStr);
-        }
-
-        if (response.headers['content-type']) res.set('Content-Type', response.headers['content-type']);
-        response.data.pipe(res);
-        req.on('close', () => response.data.destroy());
-    } catch (e) {
-        console.error(`❌ [Hanime Relay Error]: ${e.message}`);
-        res.status(500).send(e.message);
-    }
-});
 
 // --- 🟢 Global Favorites Memory Cache 🟢 ---
 let cachedFavs = [];
 const reloadFavs = () => {
     try {
         if (fs.existsSync(favoritesFile)) {
-            const data = fs.readFileSync(favoritesFile, 'utf8');
+            let data = fs.readFileSync(favoritesFile, 'utf8').trim();
+            if (!data || data === "") data = '[]';
+            // Remove any potential BOM or invisible characters
+            data = data.replace(/^\uFEFF/, '');
             cachedFavs = JSON.parse(data);
             console.log(`📡 [Memory Cache] Loaded ${cachedFavs.length} items from favorites.json`);
         }
     } catch (e) {
         console.error("❌ [Memory Cache] Failed to reload favorites:", e.message);
+        cachedFavs = []; // Fallback to empty array to prevent crashes
     }
 };
 
@@ -2008,6 +2068,9 @@ app.get('/api/image-proxy', async (req, res) => {
                 headers['Referer'] = 'https://www.eporner.com/';
                 headers['Origin'] = 'https://www.eporner.com';
                 headers['Cookie'] = 'age_verified=1; bs=s;';
+            } else if (host.includes('hanime') || host.includes('htv-services')) {
+                headers['Referer'] = 'https://hanime.tv/';
+                headers['Origin'] = 'https://hanime.tv';
             } else {
                 headers['Referer'] = `${urlObj.protocol}//${urlObj.hostname}/`;
             }

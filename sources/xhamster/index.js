@@ -31,7 +31,8 @@ router.get([
         if (type === 'anime') {
             targetUrl = p > 1 ? `https://xhamster.com/categories/hentai/${p}` : `https://xhamster.com/categories/hentai`;
         } else {
-            targetUrl = p > 1 ? `https://xhamster.com/best/${p}` : `https://xhamster.com/`;
+            // Updated to use the native /2, /3 pattern mentioned by the user
+            targetUrl = p > 1 ? `https://xhamster.com/${p}` : `https://xhamster.com/`;
         }
     }
 
@@ -281,8 +282,7 @@ router.get([
                     }
                 }
 
-                const duration = $el.find('[class*="tiny-"]').text().trim() ||
-                    $el.find('[data-role="video-duration"]').text().trim() ||
+                const duration = $el.find('[class^="tiny-"], [class*=" tiny-"], [data-role="video-duration"]').first().text().trim() ||
                     $el.find('.thumb-image-container__duration').text().trim() ||
                     $el.find('.video-thumb__duration').text().trim() || "";
 

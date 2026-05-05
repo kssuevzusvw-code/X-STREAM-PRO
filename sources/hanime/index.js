@@ -62,21 +62,28 @@ function getArgs(req, id, extra = {}) {
  * to point to our proxy instead.
  */
 function fixUrls(item) {
-    if (!item) return item;
+    const proxyBase = '/hanime-proxy';
     
     const rewrite = (url) => {
         if (!url || typeof url !== 'string') return url;
-        if (url.includes(':10000/') || url.includes('10.25.')) {
-            const parts = url.split(url.includes(':10000/') ? ':10000/' : '10000/');
-            const path = parts[1] || "";
-            return `/hanime-proxy/${path}`;
+        if (url.includes('192.168.') || url.includes('10.25.')) {
+            // Extract the path after the IP/Port
+            const pathMatch = url.match(/http:\/\/[^/]+(\/.*)/);
+            if (pathMatch) {
+                let subPath = pathMatch[1];
+                return `${proxyBase}${subPath}`;
+            }
         }
         return url;
     };
 
     if (item.poster) item.poster = rewrite(item.poster);
-    if (item.background) item.background = rewrite(item.background);
     if (item.thumbnail) item.thumbnail = rewrite(item.thumbnail);
+    if (item.background) item.background = rewrite(item.background);
+    if (item.logo) item.logo = rewrite(item.logo);
+    
+    if (item.preview) item.preview = rewrite(item.preview);
+    if (item.previewUrl) item.previewUrl = rewrite(item.previewUrl);
     
     return item;
 }
@@ -153,10 +160,27 @@ router.get('/stream/:type/:id.json', async (req, res) => {
         
         // Wrap streams with global proxy for reliability
         if (result && result.streams) {
-            result.streams = result.streams.map(s => ({
-                ...s,
-                _source: { id: 'hanime', name: 'Hanime', type: 'anime' }
-            }));
+            result.streams = result.streams.map(s => {
+                // Determine the best proxy route based on the stream type
+                let proxyUrl = s.url;
+                if (s.url.includes('.m3u8')) {
+                    proxyUrl = `/api/m3u8-proxy?url=${encodeURIComponent(s.url)}&headers=${encodeURIComponent(JSON.stringify({
+                        'Referer': 'https://hanime.tv/',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }))}`;
+                } else {
+                    proxyUrl = `/api/stream?url=${encodeURIComponent(s.url)}&headers=${encodeURIComponent(JSON.stringify({
+                        'Referer': 'https://hanime.tv/',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }))}`;
+                }
+
+                return {
+                    ...s,
+                    url: proxyUrl,
+                    _source: { id: 'hanime', name: 'Hanime', type: 'anime' }
+                };
+            });
         }
         
         res.json(result);

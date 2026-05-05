@@ -1047,6 +1047,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Favorites page only
             initFavoritesFilters();
 
+            // 🚀 Force immediate load and render on startup
+            (async () => {
+                await loadFavoritesFromDB();
+                renderFavorites();
+            })();
+
             // Smart auto-refresh: check favorites.json every 3 seconds
             let lastFavCount = favorites.length;
             setInterval(async () => {
@@ -1060,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (favorites.length !== lastFavCount) {
                     lastFavCount = favorites.length;
                     // Re-render favorites grid
-                    renderGrid();
+                    renderFavorites();
                     updateFavoritesUI();
                     console.log(`[Favorites] Updated from favorites.json: ${favorites.length} items`);
                 }
@@ -1334,16 +1340,23 @@ async function renderFavorites() {
     const grid = document.getElementById('mainGrid');
     if (!grid || CURRENT_PAGE !== 'favorites') return;
 
-    // Clear grid (including any skeletons)
+    // Clear grid
     grid.innerHTML = '';
 
-    let filtered = favorites;
+    // 1. Ensure absolute chronological sorting (Newest First)
+    favorites.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    let filtered = [...favorites];
+
+    // 2. Filter by Type (Anime vs Real)
     if (favoritesType !== 'all') {
         filtered = filtered.filter(item => {
             const isAnime = (item.type === 'anime' || (item._source && item._source.id === 'hanime') || (item._source && item._source.type === 'anime'));
             return favoritesType === 'anime' ? isAnime : !isAnime;
         });
     }
+
+    // 3. Filter by Source (Only for Real Life tab)
     if (favoritesType === 'real' && favoritesSource !== 'all') {
         filtered = filtered.filter(item => item._source && item._source.id === favoritesSource);
     }
@@ -1359,10 +1372,11 @@ async function renderFavorites() {
         return;
     }
 
+    // 4. Render directly WITHOUT allowing renderTargetGrid to re-sort
     const isVertical = favoritesType === 'anime';
-    renderTargetGrid(grid, filtered, false, isVertical);
+    renderTargetGrid(grid, filtered, false, isVertical, true); // Added 'true' flag to prevent internal sorting if supported
 
-    // 📊 Update tab counts
+    // Update tab counts
     updateFavoriteCounts();
 }
 
@@ -1879,6 +1893,12 @@ function renderGrid(append = false) {
     if (!grid) return;
 
     let sourceArray = CURRENT_PAGE === 'favorites' ? favorites : allItems;
+
+    // 🛡️ [Sorting Fix] If we are on favorites, NEVER re-sort by source here
+    if (CURRENT_PAGE === 'favorites') {
+        sourceArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    }
+
     const isVertical = CURRENT_PAGE === 'anime' || (CURRENT_PAGE === 'search' && currentSearchType === 'anime') || (CURRENT_PAGE === 'favorites' && favoritesType === 'anime');
     renderTargetGrid(grid, sourceArray, append, isVertical);
 }
@@ -2373,16 +2393,22 @@ async function handleSearchPage(query, explicitType = null, explicitSource = nul
         showSkeletons();
     }
 
-    // UI Adjustments
+    // UI Adjustments - Hide/Show source pills based on type
     const sourceBar = document.getElementById('source-bar');
-    const urlParams = new URLSearchParams(window.location.search);
-    const isAnimeUrl = urlParams.get('type') === 'anime';
-    if (sourceBar) sourceBar.style.display = (resolvedType === 'anime' || isAnimeUrl) ? 'none' : 'flex';
-
-    // Highlight the correct source pill
-    document.querySelectorAll('.source-pill').forEach(p => {
-        p.classList.toggle('active', p.dataset.source === selectedSource);
-    });
+    if (sourceBar) {
+        sourceBar.querySelectorAll('.source-pill').forEach(p => {
+            const sid = p.dataset.source;
+            const srcObj = SOURCES.find(s => s.id === sid);
+            if (sid === 'all') {
+                p.style.display = 'block';
+            } else if (resolvedType === 'anime') {
+                p.style.display = (sid === 'hanime') ? 'block' : 'none';
+            } else if (resolvedType === 'real') {
+                p.style.display = (sid === 'hanime') ? 'none' : 'block';
+            }
+            p.classList.toggle('active', sid === selectedSource);
+        });
+    }
 
     console.log(`🔍 [Focused Search] Querying ${selectedSource} for: "${sanitizedQuery}"`);
 
@@ -2589,7 +2615,16 @@ async function openPlayer(item) {
     if (extSourceBtn) {
         if (sourceLink) {
             extSourceBtn.style.display = 'inline-flex';
-            extSourceBtn.href = sourceLink;
+            // 🛡️ USER REQUEST: For Hanime, use the proxied stream link if available, otherwise fallback
+            if (item._source?.id === 'hanime') {
+                extSourceBtn.href = window.currentHlsUrl || sourceLink;
+                extSourceBtn.title = "Open Proxied Video Link";
+                extSourceBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square"></i> <span>Open Stream</span>';
+            } else {
+                extSourceBtn.href = sourceLink;
+                extSourceBtn.title = "Visit Source Website";
+                extSourceBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square"></i> <span>Open Website</span>';
+            }
         } else {
             extSourceBtn.style.display = 'none';
         }
@@ -3147,7 +3182,7 @@ async function toggleFavorite(e, item) {
     }
 
     updateFavoritesUI();
-    if (CURRENT_PAGE === 'favorites') renderGrid();
+    if (CURRENT_PAGE === 'favorites') renderFavorites();
 
     // Update active UI elements
     const btns = document.querySelectorAll(`.favorite-card-btn`);
@@ -3527,7 +3562,7 @@ async function renderSourceButtons(streams, item) {
 
     // 🎯 Store globally for ArtPlayer quality menu
     window.currentStreams = streamsWithQualities;
-    
+
     // 🎯 Clear container ONLY AFTER results are ready to be rendered
     container.innerHTML = '';
 
@@ -3733,7 +3768,7 @@ function createSourceList() {
  */
 function updateArtPlayerQualityMenu() {
     if (!window.art || !window.currentStreams || window.currentStreams.length === 0) return;
-    
+
     const streams = window.currentStreams;
     let qualities = [];
 
@@ -3796,7 +3831,16 @@ function updateArtPlayerQualityMenu() {
             if (item.url) {
                 console.log(`🎯 [Quality Switch] Changing to ${item.html}: ${item.url.substring(0, 50)}...`);
                 window.currentHlsUrl = item.url;
-                window.art.switchUrl(item.url);
+                
+                // ?? USER REQUEST: Save current time before switching quality
+                const currentTime = window.art.currentTime;
+                
+                window.art.switchUrl(item.url).then(() => {
+                    if (currentTime > 0) {
+                        window.art.currentTime = currentTime;
+                        window.art.play();
+                    }
+                });
             }
             return item.html;
         }
@@ -3813,8 +3857,8 @@ function initPlayer(initialUrl = '') {
     art = new Artplayer({
         container: container,
         url: initialUrl,
-        title: 'Video',
-        poster: '',
+        title: window.currentWatchItem ? window.currentWatchItem.name : 'Video',
+        poster: window.currentWatchItem ? (window.currentWatchItem.background || window.currentWatchItem.poster || '') : '',
         volume: 1,
         isLive: false,
         muted: false,
@@ -4409,15 +4453,52 @@ async function playUrl(url, item = null, useProxy = false, proxyIndex = 0) {
         console.log(`🛡️ [Mandatory Proxy] Applied for all sources: ${targetUrl.substring(0, 80)}...`);
     }
 
+    // 🛡️ [USER REQUEST: ULTIMATE FORCE] Override targetUrl with exact proxy URL and headers for Hanime
+    if (item?._source?.id === 'hanime' || targetUrl.includes('hanime') || targetUrl.includes('highwinds-cdn')) {
+        // Extract the raw URL first if it was already wrapped
+        let rawUrlForHanime = url;
+        if (rawUrlForHanime.includes('/api/m3u8-proxy?url=')) {
+            rawUrlForHanime = decodeURIComponent(rawUrlForHanime.split('url=')[1].split('&')[0]);
+        }
+
+        const proxyPath = rawUrlForHanime.includes('.m3u8') ? '/api/m3u8-proxy' : '/api/stream';
+        const hanimeHeaders = {
+            'Referer': 'https://hanime.tv/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        };
+        // Construct the EXACT string the user wants
+        targetUrl = `${window.location.origin}${proxyPath}?url=${encodeURIComponent(rawUrlForHanime)}&headers=${encodeURIComponent(JSON.stringify(hanimeHeaders))}`;
+        console.log(`🎯 [HANIME FORCE] Player URL fully overridden: ${targetUrl.substring(0, 100)}...`);
+    }
+
     // Final URL is already proxied via /api/ if it was external (see lines 4405-4410)
     console.log(`🎯 [Final URL] Ready for player: ${targetUrl.substring(0, 80)}...`);
-    
+
     if (container) {
         if (art) {
             console.log(`🎬 [Native Player] Switching URL: ${targetUrl.substring(0, 80)}...`);
-            art.switchUrl(targetUrl);
+            
+            // ?? USER REQUEST: Save current time before switching to resume from same spot
+            const currentTime = art.currentTime;
+            
+            art.switchUrl(targetUrl).then(() => {
+                if (currentTime > 0) {
+                    console.log(`⏳ Resuming from ${currentTime.toFixed(2)}s after server switch`);
+                    art.currentTime = currentTime;
+                    art.play();
+                }
+            });
+
+            const coverImage = (item && (item.background || item.poster)) || (window.currentWatchItem && (window.currentWatchItem.background || window.currentWatchItem.poster)) || '';
+            if (coverImage) {
+                art.poster = coverImage;
+                // Also set the container background just to be safe
+                container.style.backgroundImage = `url("${coverImage}")`;
+                container.style.backgroundSize = 'cover';
+                container.style.backgroundPosition = 'center center';
+            }
         } else {
-            container.innerHTML = ''; 
+            container.innerHTML = '';
             console.log(`🎬 [Native Player] Initializing: ${targetUrl.substring(0, 80)}...`);
             initPlayer(targetUrl);
         }
@@ -4445,7 +4526,26 @@ async function playUrl(url, item = null, useProxy = false, proxyIndex = 0) {
     }
 
     if (extSourceBtn && targetUrl) {
-        extSourceBtn.href = targetUrl;
+        // 🛡️ USER REQUEST: For Hanime, ensure we use the proxied version with headers
+        if (item?._source?.id === 'hanime' || targetUrl.includes('hanime')) {
+            let finalProxyUrl = targetUrl;
+            // If not already proxied, wrap it now
+            if (!finalProxyUrl.includes('/api/m3u8-proxy')) {
+                const proxyPath = finalProxyUrl.includes('.m3u8') ? '/api/m3u8-proxy' : '/api/stream';
+                const headers = {
+                    'Referer': 'https://hanime.tv/',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                };
+                finalProxyUrl = `${window.location.origin}${proxyPath}?url=${encodeURIComponent(finalProxyUrl)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+            }
+            extSourceBtn.href = finalProxyUrl;
+            extSourceBtn.title = "Open Proxied Video Link";
+            extSourceBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square"></i> <span>Open Stream</span>';
+        } else {
+            extSourceBtn.href = targetUrl;
+            extSourceBtn.title = "Visit Source Website";
+            extSourceBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square"></i> <span>Open Website</span>';
+        }
         extSourceBtn.style.display = 'inline-flex';
     }
 
@@ -4539,7 +4639,6 @@ async function playUrl(url, item = null, useProxy = false, proxyIndex = 0) {
             const cleanName = videoTitle.replace(/[\\/:*?"<>|]/g, '_');
             const downloadUrl = `/api/download/direct?url=${encodeURIComponent(targetUrl)}&title=${encodeURIComponent(cleanName)}`;
 
-
             // UI: Feedback that download is starting
             // dlButton.disabled = true; // REMOVED PER USER REQUEST
             const originalHTML = dlButton.innerHTML;
@@ -4631,7 +4730,13 @@ async function playUrl(url, item = null, useProxy = false, proxyIndex = 0) {
                 art.setting.update('quality', {
                     selector: qualityItems,
                     onSelect: function (item) {
-                        art.switchUrl(item.url);
+                        const currentTime = art.currentTime;
+                        art.switchUrl(item.url).then(() => {
+                            if (currentTime > 0) {
+                                art.currentTime = currentTime;
+                                art.play();
+                            }
+                        });
                         return item.html;
                     }
                 });
@@ -5111,36 +5216,32 @@ async function checkAndFetchMoreData() {
         }).catch(e => console.error("Search fetch failed", e)));
     } else {
         for (const src of sourcesToFetch) {
-            // Include all dynamic sources except hanime (which is an addon)
-            const isScraper = src.id !== 'hanime';
+            const cleanBase = getCleanBase(src.baseUrl);
+            const catalogId = src.priority[0];
+            const sourceId = src.id;
 
-            if (isScraper) {
-                const cleanBase = getCleanBase(src.baseUrl);
-                const catalogId = src.priority[0];
-                const sourceId = src.id;
+            if (!pageBySource[sourceId]) pageBySource[sourceId] = 1; else pageBySource[sourceId]++;
+            const currentSourcePage = pageBySource[sourceId];
 
-                if (!pageBySource[sourceId]) pageBySource[sourceId] = 1; else pageBySource[sourceId]++;
-                const currentSourcePage = pageBySource[sourceId];
+            // Determine content types based on source type (anime vs real)
+            const types = src.type === 'anime' ? ['anime', 'series', 'movie'] : ['movie'];
 
-                // Determine content types based on source type (anime vs real)
-                const types = src.type === 'anime' ? ['anime', 'series', 'movie'] : ['movie'];
+            // Use a larger skip multiplier to ensure we actually hit the next page on the server
+            // Hanime uses 48 per page, others vary. 48 is a safe bet for a "step".
+            let skipMultiplier = (src.id === 'hanime') ? 48 : 24;
 
-                // Use a consistent skip multiplier (20 matches Teenxy's page size)
-                let skipMultiplier = 20;
+            for (const type of types) {
+                const skip = currentSourcePage * skipMultiplier;
+                let url = `${cleanBase}/catalog/${type}/${encodeURIComponent(catalogId)}/skip=${skip}.json?_cb=${Date.now()}`;
+                if (currentGenre && currentGenre !== 'all') url = `${cleanBase}/catalog/${type}/${encodeURIComponent(catalogId)}/genre=${encodeURIComponent(currentGenre)}/skip=${skip}.json?_cb=${Date.now()}`;
 
-                for (const type of types) {
-                    const skip = currentSourcePage * skipMultiplier;
-                    let url = `${cleanBase}/catalog/${type}/${encodeURIComponent(catalogId)}/skip=${skip}.json?_cb=${Date.now()}`;
-                    if (currentGenre && currentGenre !== 'all') url = `${cleanBase}/catalog/${type}/${encodeURIComponent(catalogId)}/genre=${encodeURIComponent(currentGenre)}/skip=${skip}.json?_cb=${Date.now()}`;
-
-                    fetchPromises.push(fetchJsonWithRetry(url, 0).then(data => {
-                        if (data && data.metas && data.metas.length > 0) {
-                            let items = data.metas.map(m => normalizeItem(m, src));
-                            const unique = items.filter(m => !allItems.some(existing => existing.id === m.id));
-                            if (unique.length > 0) { allItems = [...allItems, ...unique]; fetchedAny = true; }
-                        }
-                    }).catch(e => { console.warn('Fetch error:', e); }));
-                }
+                fetchPromises.push(fetchJsonWithRetry(url, 0).then(data => {
+                    if (data && data.metas && data.metas.length > 0) {
+                        let items = data.metas.map(m => normalizeItem(m, src));
+                        const unique = items.filter(m => !allItems.some(existing => existing.id === m.id));
+                        if (unique.length > 0) { allItems = [...allItems, ...unique]; fetchedAny = true; }
+                    }
+                }).catch(e => { console.warn('Fetch error:', e); }));
             }
         }
 
@@ -5169,12 +5270,12 @@ function showExternalPlayerOptions(videoUrl, title) {
     try {
         let current = videoUrl;
         let lastExtracted = null;
-        
+
         while (current.includes('?url=') || current.includes('&url=')) {
             const searchPart = current.includes('?') ? current.split('?')[1] : current;
             const params = new URLSearchParams(searchPart);
             const extracted = params.get('url');
-            
+
             if (extracted && extracted !== current) {
                 current = decodeURIComponent(extracted);
                 lastExtracted = current;
@@ -5182,7 +5283,7 @@ function showExternalPlayerOptions(videoUrl, title) {
                 break; // No more url params found
             }
         }
-        
+
         if (lastExtracted) rawVideoUrl = lastExtracted;
     } catch (e) { console.warn("Failed to extract raw URL:", e); }
 
@@ -5647,11 +5748,11 @@ window.loadMoreContent = function () {
     if (renderedCount >= filteredLength) {
         const step = 1;
         if (CURRENT_PAGE === 'search') {
-            if (sourcePages[currentSourceFilter] === undefined) sourcePages[currentSourceFilter] = 1;
+            if (sourcePages[currentSourceFilter] === undefined) sourcePages[currentSourceFilter] = 0;
+            sourcePages[currentSourceFilter] += step;
         }
         page += step;
         checkAndFetchMoreData().then(() => {
-            if (CURRENT_PAGE === 'search') sourcePages[currentSourceFilter] += step;
             renderGrid(true);
         }).catch(e => { window.isFetchingMore = false; });
     } else renderGrid(true);

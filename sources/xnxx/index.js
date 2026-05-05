@@ -21,13 +21,14 @@ router.get([
     let skipRaw = req.params.skip || '0';
     if (skipRaw.endsWith('.json')) skipRaw = skipRaw.slice(0, -5);
     const skip = parseInt(skipRaw);
-    let targetUrl = skip > 0 ? `https://www.xnxx.com/search/hot/${Math.floor(skip / 30)}` : `https://www.xnxx.com/search/hot`;
+    const p = skip > 0 ? Math.floor(skip / 30) : '';
+    let targetUrl = p ? `https://www.xnxx.com/search/hot/${p}` : `https://www.xnxx.com/search/hot/`;
 
     if (query) {
-        targetUrl = `https://www.xnxx.com/search/${encodeURIComponent(query)}/${skip > 0 ? Math.floor(skip / 30) : ''}`.replace(/\/$/, "");
+        targetUrl = `https://www.xnxx.com/search/${encodeURIComponent(query)}/${p}`.replace(/\/?$/, "/");
     } else if (idParam && idParam.includes('search=')) {
         let q = idParam.split('search=')[1];
-        targetUrl = `https://www.xnxx.com/search/${encodeURIComponent(q)}/${skip > 0 ? Math.floor(skip / 30) : ''}`.replace(/\/$/, "");
+        targetUrl = `https://www.xnxx.com/search/${encodeURIComponent(q)}/${p}`.replace(/\/?$/, "/");
     }
 
     try {
@@ -77,12 +78,12 @@ router.get([
             const encodedPath = Buffer.from(videoPath).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
             let duration = $el.find('.duration, .time').text().replace(/<[^>]+>/g, '').trim();
-            if (!duration) {
+            if (!duration || duration.length < 2) {
                 const metadataText = $el.find('.metadata').text();
-                const dMatch = metadataText.match(/(\d+\s*(?:min|sec|h)(?!\w))/);
+                const dMatch = metadataText.match(/(\d+\s*(?:min|sec|h|m|s)(?!\w))/i);
                 if (dMatch) duration = dMatch[1];
             }
-            let preview = $el.attr('data-pvv') || $el.attr('data-videopv') || $el.find('img').attr('data-src-preview') || "";
+            let preview = $el.find('.videopv video').attr('src') || $el.attr('data-pvv') || $el.attr('data-videopv') || $el.find('img').attr('data-src-preview') || "";
 
             if (!preview && poster) {
                 let pBase = poster.split('/').slice(0, -1).join('/');
@@ -119,58 +120,56 @@ router.get('/meta/movie/:id.json', async (req, res) => {
     const targetUrl = `https://www.xnxx.com${path}`;
 
     try {
-        console.log(`📡 [XNXX Meta] Fetching: ${targetUrl}`);
-        let response;
-        try {
-            response = await axios.get(targetUrl, { timeout: 25000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36' } });
-        } catch (e) {
-            console.warn(`⚠️ [XNXX Meta] Direct fetch failed for ${targetUrl}, trying proxy...`);
-            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
-            response = await axios.get(proxyUrl, { timeout: 25000 });
-        }
-        const html = response.data;
-        if (!html) throw new Error('Empty response from XNXX');
-
+        const html = await scraperFetch(targetUrl, 25000);
+        const $ = cheerio.load(html);
         const related = [];
-        let blocks = html.split(/class="thumb-block\s*"/);
-        if (blocks.length <= 1) blocks = html.split('id="video_');
 
-        blocks.slice(1, 40).forEach(block => {
-            try {
-                const urlMatch = block.match(/href="\/video-([^"]+?)"/) || block.match(/href="([^"]+)"/);
-                const posterMatch = block.match(/data-src="([^"]+)"/) || block.match(/src="([^"]+)"/);
-                const titleMatch = block.match(/title="([^"]+)"/) || block.match(/alt="([^"]+)"/);
+        $('.thumb-block, .video, .frame-block').each((i, el) => {
+            const $el = $(el);
+            const $link = $el.find('a[href*="/video"]').first();
+            const href = $link.attr('href');
+            if (!href || related.length >= 40) return;
 
-                if (urlMatch && posterMatch && titleMatch) {
-                    const videoPath = urlMatch[1].startsWith('/video-') ? urlMatch[1] : (urlMatch[1].startsWith('http') ? new URL(urlMatch[1]).pathname : urlMatch[1]);
-                    const enc = Buffer.from(videoPath).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-                    related.push({
-                        id: 'xn_' + enc,
-                        type: 'movie',
-                        name: titleMatch[1].replace(/&quot;/g, '"'),
-                        poster: posterMatch[1].replace('THUMBNUM', '1'),
-                        background: posterMatch[1].replace('THUMBNUM', '1')
-                    });
-                }
-            } catch (e) { }
+            let name = $el.find('.title a, p.title a, .video-title a').text().trim() ||
+                $el.find('a[title]').first().attr('title') ||
+                $el.find('.title, p.title').text().trim() ||
+                $el.find('img').attr('alt') ||
+                "XNXX Related";
+
+            let poster = $el.find('img').attr('data-src') || $el.find('img').attr('src') || "";
+            if (poster.startsWith('//')) poster = 'https:' + poster;
+            poster = poster.replace('THUMBNUM', '1');
+
+            const videoPath = href.startsWith('/video-') ? href : (href.startsWith('http') ? new URL(href).pathname : `/video-${href}`);
+            const encodedPath = Buffer.from(videoPath).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+            related.push(wrapGlobalMedia({
+                id: 'xn_' + encodedPath,
+                type: 'movie',
+                name: name.replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+                poster: poster,
+                background: poster,
+                _source: { id: 'xnxx', type: 'real' }
+            }));
         });
 
         const nMatch = html.match(/<title>([^<]+)<\/title>/);
         const name = nMatch ? nMatch[1].replace(' - XNXX.COM', '').trim() : "XNXX Video";
 
         const posterMatch = html.match(/<meta property="og:image" content="([^"]+)"/) || html.match(/<link rel="image_src" href="([^"]+)"/);
-        const poster = posterMatch ? posterMatch[1] : "";
+        const mainPoster = posterMatch ? posterMatch[1] : "";
 
         res.json({
             meta: wrapGlobalMedia({
                 id: req.params.id,
                 type: 'movie',
                 name: name,
-                poster: poster,
-                thumbnail: poster,
-                background: poster,
+                poster: mainPoster,
+                thumbnail: mainPoster,
+                background: mainPoster,
                 related: related,
-                url: targetUrl
+                url: targetUrl,
+                _source: { id: 'xnxx', type: 'real' }
             })
         });
     } catch (e) {
