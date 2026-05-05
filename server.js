@@ -126,24 +126,16 @@ const createImageProxyMiddleware = require(path.join(hanimeAddonPath, 'lib', 'mi
 const hanimeApiClient = new HanimeApiClient(hanimeConfig);
 const hanimeProxy = createImageProxyMiddleware(hanimeConfig, hanimeApiClient);
 
-// Use prefix matching to avoid Express 5 wildcard issues with hyphens/colons
-app.use('/hanime-proxy/proxy/image', (req, res, next) => {
-    const prefix = '/hanime-proxy/proxy/image';
-    if (!req.path.startsWith(prefix)) return next();
-    
-    // Extract the part after the prefix and remove leading slash
-    let fullPath = req.path.substring(prefix.length);
-    if (fullPath.startsWith('/')) fullPath = fullPath.substring(1);
-    
-    if (!fullPath) return next();
-    
+// Use wildcard to capture EVERYTHING and parse manually to avoid Express param issues with hyphens/colons
+app.use('/hanime-proxy/proxy/image/*', (req, res, next) => {
+    const fullPath = req.params[0]; // This captures everything after 'image/'
     const parts = fullPath.split('/');
-    
+
     if (parts.length >= 2) {
         // Detect which part is the type (poster/background/etc) and which is the ID
         const knownTypes = ['poster', 'background', 'thumbnail', 'logo', 'cover'];
         let type, id;
-        
+
         if (knownTypes.includes(parts[0].toLowerCase())) {
             type = parts[0];
             id = decodeURIComponent(parts[1]);
