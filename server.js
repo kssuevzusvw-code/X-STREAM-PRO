@@ -127,8 +127,11 @@ const hanimeApiClient = new HanimeApiClient(hanimeConfig);
 const hanimeProxy = createImageProxyMiddleware(hanimeConfig, hanimeApiClient);
 
 // Use wildcard to capture EVERYTHING and parse manually to avoid Express param issues with hyphens/colons
-app.use('/hanime-proxy/proxy/image/*', (req, res, next) => {
-    const fullPath = req.params[0]; // This captures everything after 'image/'
+app.use('/hanime-proxy/proxy/image/:path*', (req, res, next) => {
+    let fullPath = req.params.path || req.params[0] || ''; 
+    if (Array.isArray(fullPath)) fullPath = fullPath.join('/');
+    
+    if (!fullPath || typeof fullPath !== 'string') return next();
     const parts = fullPath.split('/');
     
     if (parts.length >= 2) {
