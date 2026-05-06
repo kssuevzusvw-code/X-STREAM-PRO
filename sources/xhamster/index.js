@@ -10,10 +10,10 @@ router.get('/manifest.json', (req, res) => {
 });
 
 router.get([
-    '/catalog/:type/:id.json',
-    '/catalog/:type/:id/search=:query.json',
-    '/catalog/:type/:id/skip=:skip.json',
-    '/catalog/:type/:id/search=:query/skip=:skip.json'
+    '/catalog/:type/:id',
+    '/catalog/:type/:id/search=:query',
+    '/catalog/:type/:id/skip=:skip',
+    '/catalog/:type/:id/search=:query/skip=:skip'
 ], async (req, res) => {
     let query = req.params.query || (req.params.id && req.params.id.includes('search=') ? req.params.id.split('search=')[1] : null);
     if (query && query.endsWith('.json')) query = query.slice(0, -5);
@@ -324,7 +324,7 @@ router.get([
     }
 });
 
-router.get('/meta/:type/:id.json', async (req, res) => {
+router.get('/meta/:type/:id', async (req, res) => {
     let xhId = req.params.id.replace('xh_', '').replace('.json', '');
     const targetUrl = `https://xhamster.com/videos/${xhId}`;
 
@@ -388,7 +388,7 @@ router.get('/meta/:type/:id.json', async (req, res) => {
                 name: name,
                 poster: poster,
                 background: poster,
-                        related: related,
+                related: related,
                 url: targetUrl
             })
         });
@@ -397,7 +397,7 @@ router.get('/meta/:type/:id.json', async (req, res) => {
     }
 });
 
-router.get('/stream/movie/:id.json', async (req, res) => {
+router.get('/stream/movie/:id', async (req, res) => {
     let xhId = req.params.id.replace('xh_', '').replace('.json', '');
     const targetUrl = `https://xhamster.com/videos/${xhId}`;
 
@@ -412,7 +412,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
         if (cfHlsMatches) {
             [...new Set(cfHlsMatches)].forEach(url => {
                 let baseUrl = url.replace(/\\/g, '');
-                
+
                 // 🔍 Extract available qualities from the "multi=" part of the URL
                 let availableQualities = ['720p']; // Default fallback
                 const multiMatch = baseUrl.match(/multi=([^/]+)/);
@@ -426,7 +426,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
 
                 availableQualities.forEach(q => {
                     let finalUrl = baseUrl;
-                    
+
                     // Replace _TPL_ or any existing quality with the target quality
                     if (finalUrl.includes('_TPL_')) {
                         finalUrl = finalUrl.replace('_TPL_', q);
@@ -435,8 +435,8 @@ router.get('/stream/movie/:id.json', async (req, res) => {
                         finalUrl = finalUrl.replace(/\d+p(?=\.av1\.mp4\.m3u8|\.h264\.mp4\.m3u8|\.mp4\.m3u8)/, q);
                     }
 
-                    streams.push({ 
-                        title: `⭐ X-Stream Premium (${q})`, 
+                    streams.push({
+                        title: `⭐ X-Stream Premium (${q})`,
                         url: proxyBase + encodeURIComponent(finalUrl) + '&referer=https://xhamster.com/&origin=https://xhamster.com',
                         quality: q,
                         addon: 'XHamster'
@@ -450,7 +450,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
         if (stateMatch) {
             try {
                 const data = JSON.parse(stateMatch[1]);
-                
+
                 const extractDirectUrls = (obj) => {
                     const stack = [obj];
                     const seen = new Set();
@@ -458,7 +458,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
                         const curr = stack.pop();
                         if (!curr || typeof curr !== 'object' || seen.has(curr)) continue;
                         seen.add(curr);
-                        
+
                         for (const k in curr) {
                             const val = curr[k];
                             if (typeof val === 'string' && val.includes('http') && val.includes('.mp4')) {
@@ -474,9 +474,9 @@ router.get('/stream/movie/:id.json', async (req, res) => {
                                 else if (val.includes('1080p')) q = '1080p';
                                 else if (val.includes('720p')) q = '720p';
                                 else if (val.includes('480p')) q = '480p';
-                                
-                                streams.push({ 
-                                    title: `XHamster MP4 (${q})`, 
+
+                                streams.push({
+                                    title: `XHamster MP4 (${q})`,
                                     url: `${streamProxy}${encodeURIComponent(val)}&referer=https://xhamster.com/`,
                                     quality: q,
                                     addon: 'XHamster'
@@ -493,7 +493,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
 
         // 🎯 4. Final Deduplication and Sorting
         const uniqueStreams = Array.from(new Map(streams.map(item => [item.url, item])).values());
-        
+
         // Sort: Premium first, then by quality
         const qMap = { '2160p': 7, '1440p': 6, '1080p': 5, '720p': 4, '480p': 3, '360p': 2, '240p': 1, 'HD': 0 };
         uniqueStreams.sort((a, b) => {

@@ -10,7 +10,7 @@ router.get('/manifest.json', (req, res) => {
 });
 
 router.get([
-    '/catalog/movie/:id.json', '/catalog/movie/:id/search=:query.json', '/catalog/movie/:id/skip=:skip.json', '/catalog/movie/:id/search=:query/skip=:skip.json'
+    '/catalog/movie/:id', '/catalog/movie/:id/search=:query', '/catalog/movie/:id/skip=:skip', '/catalog/movie/:id/search=:query/skip=:skip'
 ], async (req, res) => {
     let idParam = req.params.id || '';
     if (idParam.endsWith('.json')) idParam = idParam.slice(0, -5);
@@ -114,7 +114,7 @@ router.get([
     }
 });
 
-router.get('/meta/movie/:id.json', async (req, res) => {
+router.get('/meta/movie/:id', async (req, res) => {
     const encoded = req.params.id.replace('xn_', '').replace(/-/g, '+').replace(/_/g, '/');
     const path = Buffer.from(encoded, 'base64').toString('utf8');
     const targetUrl = `https://www.xnxx.com${path}`;
@@ -178,7 +178,7 @@ router.get('/meta/movie/:id.json', async (req, res) => {
     }
 });
 
-router.get('/stream/movie/:id.json', async (req, res) => {
+router.get('/stream/movie/:id', async (req, res) => {
     const encoded = req.params.id.replace('xn_', '').replace(/-/g, '+').replace(/_/g, '/');
     const path = Buffer.from(encoded, 'base64').toString('utf8');
     const targetUrl = `https://www.xnxx.com${path}`;

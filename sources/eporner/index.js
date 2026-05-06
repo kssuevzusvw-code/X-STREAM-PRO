@@ -10,10 +10,10 @@ router.get('/manifest.json', (req, res) => {
 });
 
 router.get([
-    '/catalog/movie/:id.json',
-    '/catalog/movie/:id/search=:query.json',
-    '/catalog/movie/:id/skip=:skip.json',
-    '/catalog/movie/:id/search=:query/skip=:skip.json'
+    '/catalog/movie/:id',
+    '/catalog/movie/:id/search=:query',
+    '/catalog/movie/:id/skip=:skip',
+    '/catalog/movie/:id/search=:query/skip=:skip'
 ], async (req, res) => {
     let query = req.params.query || (req.params.id && req.params.id.includes('search=') ? req.params.id.split('search=')[1] : null);
     if (query && query.endsWith('.json')) query = query.slice(0, -5);
@@ -83,7 +83,7 @@ router.get([
     }
 });
 
-router.get('/meta/movie/:id.json', async (req, res) => {
+router.get('/meta/movie/:id', async (req, res) => {
     try {
         let encoded = req.params.id.replace('ep_', '').replace(/-/g, '+').replace(/_/g, '/');
         if (encoded.endsWith('.json')) encoded = encoded.slice(0, -5);
@@ -130,7 +130,7 @@ router.get('/meta/movie/:id.json', async (req, res) => {
     }
 });
 
-router.get('/stream/movie/:id.json', async (req, res) => {
+router.get('/stream/movie/:id', async (req, res) => {
     let id = req.params.id;
     let targetUrl = "";
 

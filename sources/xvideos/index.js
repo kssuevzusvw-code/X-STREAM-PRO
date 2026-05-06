@@ -19,10 +19,10 @@ router.get('/manifest.json', (req, res) => {
 });
 
 router.get([
-    '/catalog/movie/:id.json',
-    '/catalog/movie/:id/search=:query.json',
-    '/catalog/movie/:id/skip=:skip.json',
-    '/catalog/movie/:id/search=:query/skip=:skip.json'
+    '/catalog/movie/:id',
+    '/catalog/movie/:id/search=:query',
+    '/catalog/movie/:id/skip=:skip',
+    '/catalog/movie/:id/search=:query/skip=:skip'
 ], async (req, res) => {
     let idParam = req.params.id || '';
     if (idParam.endsWith('.json')) idParam = idParam.slice(0, -5);
@@ -49,7 +49,7 @@ router.get([
         let response;
         const axiosConfig = {
             timeout: 25000,
-            headers: { 
+            headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Referer': 'https://www.xvideos.com/',
                 'Cookie': 'age_verified=1'
@@ -114,7 +114,7 @@ router.get([
     }
 });
 
-router.get('/stream/movie/:id.json', async (req, res) => {
+router.get('/stream/movie/:id', async (req, res) => {
     const encoded = req.params.id.replace('xv_', '').replace(/-/g, '+').replace(/_/g, '/');
     const pathStr = Buffer.from(encoded, 'base64').toString('utf8');
 
@@ -184,7 +184,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
     }
 });
 
-router.get('/meta/movie/:id.json', async (req, res) => {
+router.get('/meta/movie/:id', async (req, res) => {
     const encoded = req.params.id.replace('xv_', '').replace(/-/g, '+').replace(/_/g, '/');
     const path = Buffer.from(encoded, 'base64').toString('utf8');
     const targetUrl = `https://www.xvideos.com${path}`;

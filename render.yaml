@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: x-stream-pro
+    env: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: VPN_PORT
+        value: 4000

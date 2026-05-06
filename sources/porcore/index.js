@@ -19,7 +19,7 @@ router.get('/manifest.json', (req, res) => {
     });
 });
 
-router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/catalog/:type/:id/search=:query.json', '/catalog/:type/:id/search=:query/skip=:skip.json'], async (req, res) => {
+router.get(['/catalog/:type/:id', '/catalog/:type/:id/skip=:skip', '/catalog/:type/:id/search=:query', '/catalog/:type/:id/search=:query/skip=:skip'], async (req, res) => {
     try {
         let query = req.params.query || (req.params.id && req.params.id.includes('search=') ? req.params.id.split('search=')[1] : null);
         if (query && query.endsWith('.json')) query = query.slice(0, -5);
@@ -133,7 +133,7 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
     }
 });
 
-router.get(['/meta/:type/:id.json'], async (req, res) => {
+router.get(['/meta/:type/:id'], async (req, res) => {
     try {
         const fullId = req.params.id;
         const id = fullId.replace('porcore_', '');
@@ -186,7 +186,7 @@ router.get(['/meta/:type/:id.json'], async (req, res) => {
     }
 });
 
-router.get(['/stream/:type/:id.json'], async (req, res) => {
+router.get(['/stream/:type/:id'], async (req, res) => {
     try {
         const id = req.params.id.replace('porcore_', '');
         const url = `https://porcore.com/video/${id}/`;

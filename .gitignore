@@ -1,0 +1,10 @@
+node_modules/
+.env
+downloads/
+thumbnails/
+previews/
+video_durations.json
+favorites.json
+.DS_Store
+dist/
+*.log

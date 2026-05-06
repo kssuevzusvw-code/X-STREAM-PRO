@@ -8,10 +8,10 @@ router.get('/manifest.json', (req, res) => {
 });
 
 router.get([
-    '/catalog/movie/:id.json',
-    '/catalog/movie/:id/search=:query.json',
-    '/catalog/movie/:id/skip=:skip.json',
-    '/catalog/movie/:id/search=:query/skip=:skip.json'
+    '/catalog/movie/:id',
+    '/catalog/movie/:id/search=:query',
+    '/catalog/movie/:id/skip=:skip',
+    '/catalog/movie/:id/search=:query/skip=:skip'
 ], async (req, res) => {
     let idParam = req.params.id || '';
     if (idParam.endsWith('.json')) idParam = idParam.slice(0, -5);
@@ -94,7 +94,7 @@ router.get([
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/meta/movie/:id.json', async (req, res) => {
+router.get('/meta/movie/:id', async (req, res) => {
     let rawId = req.params.id;
     if (rawId.endsWith('.json')) rawId = rawId.slice(0, -5);
 
@@ -175,7 +175,7 @@ router.get('/meta/movie/:id.json', async (req, res) => {
     }
 });
 
-router.get('/stream/movie/:id.json', async (req, res) => {
+router.get('/stream/movie/:id', async (req, res) => {
     let rawId = req.params.id;
     if (rawId.endsWith('.json')) rawId = rawId.slice(0, -5);
 
@@ -195,7 +195,7 @@ router.get('/stream/movie/:id.json', async (req, res) => {
             'Cookie': 'bs=s; age_verified=1',
             'Referer': 'https://www.pornhub.com/'
         });
-        
+
         let streams = [];
 
         const hlsMatch = html.match(/"videoUrl":"([^"]+)"/);

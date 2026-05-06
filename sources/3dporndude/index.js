@@ -9,7 +9,7 @@ router.get('/manifest.json', (req, res) => {
     res.json({ id: 'org.xstream.3dporndude', version: '1.0.0', name: '3DPornDude', resources: ['catalog', 'meta', 'stream'], types: ['movie'], catalogs: [{ type: 'movie', id: '3dporndude' }] });
 });
 
-router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/catalog/:type/:id/search=:query.json', '/catalog/:type/:id/search=:query/skip=:skip.json'], async (req, res) => {
+router.get(['/catalog/:type/:id', '/catalog/:type/:id/skip=:skip', '/catalog/:type/:id/search=:query', '/catalog/:type/:id/search=:query/skip=:skip'], async (req, res) => {
     try {
         let query = req.params.query || (req.params.id && req.params.id.includes('search=') ? req.params.id.split('search=')[1] : null);
         if (query && query.endsWith('.json')) query = query.slice(0, -5);
@@ -46,35 +46,35 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
             const $el = $(el);
             const $link = $el.find('a[href*="/video/"], a[href*="/v/"], a[href*="/out/"]').first();
             const href = $link.attr('href');
-                const title = $el.find('.title').first().text().trim() || $link.attr('title') || $el.find('h5, h3, .name').text().trim() || $el.find('img').attr('alt');
-                let poster = $el.find('img').attr('data-webp') || $el.find('img').attr('data-src') || $el.find('img').attr('data-original') || $el.find('img').attr('src');
+            const title = $el.find('.title').first().text().trim() || $link.attr('title') || $el.find('h5, h3, .name').text().trim() || $el.find('img').attr('alt');
+            let poster = $el.find('img').attr('data-webp') || $el.find('img').attr('data-src') || $el.find('img').attr('data-original') || $el.find('img').attr('src');
 
-                if (href && title && poster && !poster.includes('clear.gif')) {
-                    let videoUrl = href.startsWith('http') ? href : 'https://3dporndude.com' + (href.startsWith('/') ? '' : '/') + href;
-                    const encId = Buffer.from(videoUrl).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            if (href && title && poster && !poster.includes('clear.gif')) {
+                let videoUrl = href.startsWith('http') ? href : 'https://3dporndude.com' + (href.startsWith('/') ? '' : '/') + href;
+                const encId = Buffer.from(videoUrl).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
-                    if (poster.startsWith('/')) poster = 'https://3dporndude.com' + poster;
+                if (poster.startsWith('/')) poster = 'https://3dporndude.com' + poster;
 
-                    // Improved duration extraction
-                    const durationRaw = $el.find('.time, .duration, .video-duration').first().text().trim();
-                    const duration = durationRaw ? durationRaw.match(/\d+[\d:]+/) ? durationRaw.match(/\d+[\d:]+/)[0] : durationRaw : "";
-                    
-                    // Optional: fetch quality if available
-                    const quality = $el.find('.qualtiy, .quality').text().trim();
-                    const finalName = quality ? `[${quality}] ${title}` : title;
+                // Improved duration extraction
+                const durationRaw = $el.find('.time, .duration, .video-duration').first().text().trim();
+                const duration = durationRaw ? durationRaw.match(/\d+[\d:]+/) ? durationRaw.match(/\d+[\d:]+/)[0] : durationRaw : "";
 
-                    const preview = $el.find('video source').attr('src') || $el.find('video').attr('src') || $el.attr('data-video-preview') || "";
+                // Optional: fetch quality if available
+                const quality = $el.find('.qualtiy, .quality').text().trim();
+                const finalName = quality ? `[${quality}] ${title}` : title;
 
-                    metas.push({
-                        id: `3dporndude_${encId}`,
-                        type: 'movie',
-                        name: finalName.replace(/&amp;/g, '&').replace(/<[^>]+>/g, '').trim(),
-                        poster: poster,
-                        posterShape: 'landscape',
-                        duration: duration,
-                        preview: preview
-                    });
-                }
+                const preview = $el.find('video source').attr('src') || $el.find('video').attr('src') || $el.attr('data-video-preview') || "";
+
+                metas.push({
+                    id: `3dporndude_${encId}`,
+                    type: 'movie',
+                    name: finalName.replace(/&amp;/g, '&').replace(/<[^>]+>/g, '').trim(),
+                    poster: poster,
+                    posterShape: 'landscape',
+                    duration: duration,
+                    preview: preview
+                });
+            }
         });
 
         if (metas.length === 0) {
@@ -101,7 +101,7 @@ router.get(['/catalog/:type/:id.json', '/catalog/:type/:id/skip=:skip.json', '/c
     } catch (e) { res.json({ metas: [] }); }
 });
 
-router.get(['/meta/:type/:id.json'], async (req, res) => {
+router.get(['/meta/:type/:id'], async (req, res) => {
     try {
         let rawId = req.params.id.replace('3dporndude_', '');
         if (rawId.endsWith('.json')) rawId = rawId.slice(0, -5);
@@ -160,7 +160,7 @@ router.get(['/meta/:type/:id.json'], async (req, res) => {
     }
 });
 
-router.get(['/stream/:type/:id.json'], async (req, res) => {
+router.get(['/stream/:type/:id'], async (req, res) => {
     try {
         let rawId = req.params.id.replace('3dporndude_', '');
         if (rawId.endsWith('.json')) rawId = rawId.slice(0, -5);
@@ -179,7 +179,7 @@ router.get(['/stream/:type/:id.json'], async (req, res) => {
                     url = canonicalMatch[1];
                     console.log(`[3DPornDude] Recovered URL: ${url}`);
                 } else {
-                    url = `https://3dporndude.com/video/${rawId}/`; 
+                    url = `https://3dporndude.com/video/${rawId}/`;
                 }
             } catch (e) {
                 console.log(`[3DPornDude] Recover failed, using fallback: ${e.message}`);

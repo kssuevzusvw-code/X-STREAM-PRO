@@ -37,10 +37,10 @@ const DEFAULT_CONFIG = {
  */
 function getArgs(req, id, extra = {}) {
     let userConfig = DEFAULT_CONFIG;
-    
+
     const pathParts = req.originalUrl.split('/');
     const configPart = pathParts.find(p => p.startsWith('%7B') || p.startsWith('{'));
-    
+
     if (configPart) {
         try {
             userConfig = JSON.parse(decodeURIComponent(configPart));
@@ -63,7 +63,7 @@ function getArgs(req, id, extra = {}) {
  */
 function fixUrls(item) {
     const proxyBase = '/hanime-proxy';
-    
+
     const rewrite = (url) => {
         if (!url || typeof url !== 'string') return url;
         if (url.includes('192.168.') || url.includes('10.25.')) {
@@ -81,10 +81,10 @@ function fixUrls(item) {
     if (item.thumbnail) item.thumbnail = rewrite(item.thumbnail);
     if (item.background) item.background = rewrite(item.background);
     if (item.logo) item.logo = rewrite(item.logo);
-    
+
     if (item.preview) item.preview = rewrite(item.preview);
     if (item.previewUrl) item.previewUrl = rewrite(item.previewUrl);
-    
+
     return item;
 }
 
@@ -97,23 +97,25 @@ router.get('/manifest.json', (req, res) => {
 
 // Catalog Route
 router.get([
-    '/catalog/:type/:id.json',
-    '/catalog/:type/:id/search=:query.json',
-    '/catalog/:type/:id/skip=:skip.json',
-    '/catalog/:type/:id/search=:query/skip=:skip.json',
-    '/catalog/:type/:id/genre=:genre.json',
-    '/catalog/:type/:id/genre=:genre/skip=:skip.json'
+    '/catalog/:type/:id',
+    /^\/catalog\/([^/]+)\/([^/]+)\/(.*)/
 ], async (req, res) => {
     try {
-        const { type, id, query, skip, genre } = req.params;
+        const type = req.params.type || req.params[0];
+        const id = req.params.id || req.params[1];
+        const extraPath = req.params.extra || req.params[2] || '';
         const extra = {};
-        if (query) extra.search = query.replace('.json', '');
-        if (skip) extra.skip = parseInt(skip.replace('.json', ''));
-        if (genre) extra.genre = genre.replace('.json', '');
 
-        const args = getArgs(req, id, extra);
+        // Parse Stremio extra parameters from the path (e.g. search=foo/skip=10)
+        extraPath.split('/').forEach(part => {
+            if (part.includes('search=')) extra.search = part.split('search=')[1].replace('.json', '');
+            if (part.includes('skip=')) extra.skip = parseInt(part.split('skip=')[1].replace('.json', ''));
+            if (part.includes('genre=')) extra.genre = part.split('genre=')[1].replace('.json', '');
+        });
+
+        const args = getArgs(req, id.replace('.json', ''), extra);
         const result = await catalogHandler.handle(args);
-        
+
         // Ensure metas have the correct source info for X-STREAM UI
         if (result && result.metas) {
             result.metas = result.metas.map(m => {
@@ -124,7 +126,7 @@ router.get([
                 };
             });
         }
-        
+
         res.json(result);
     } catch (e) {
         console.error("Hanime Source Error (Catalog):", e.message);
@@ -133,17 +135,17 @@ router.get([
 });
 
 // Meta Route
-router.get('/meta/:type/:id.json', async (req, res) => {
+router.get('/meta/:type/:id', async (req, res) => {
     try {
         const { type, id } = req.params;
         const args = getArgs(req, id.replace('.json', ''));
         const result = await metaHandler.handle(args);
-        
+
         if (result && result.meta) {
             fixUrls(result.meta);
             result.meta._source = { id: 'hanime', name: 'Hanime', type: 'anime' };
         }
-        
+
         res.json(result);
     } catch (e) {
         console.error("Hanime Source Error (Meta):", e.message);
@@ -152,12 +154,12 @@ router.get('/meta/:type/:id.json', async (req, res) => {
 });
 
 // Stream Route
-router.get('/stream/:type/:id.json', async (req, res) => {
+router.get('/stream/:type/:id', async (req, res) => {
     try {
         const { type, id } = req.params;
         const args = getArgs(req, id.replace('.json', ''));
         const result = await streamHandler.handle(args);
-        
+
         // Wrap streams with global proxy for reliability
         if (result && result.streams) {
             result.streams = result.streams.map(s => {
@@ -182,7 +184,7 @@ router.get('/stream/:type/:id.json', async (req, res) => {
                 };
             });
         }
-        
+
         res.json(result);
     } catch (e) {
         console.error("Hanime Source Error (Stream):", e.message);

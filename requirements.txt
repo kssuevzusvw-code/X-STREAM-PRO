@@ -1,0 +1,2 @@
+# Empty requirements file for Render Python environment
+# media_server.py only uses standard libraries

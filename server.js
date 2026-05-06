@@ -68,7 +68,7 @@ try {
 const cheerio = require('cheerio');
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const SERVER_BASE = ''; // Make relative to work on any IP
 
 // 🌐 Startup Check: Verify VPN Connection (Force IPv4)
@@ -127,8 +127,8 @@ const hanimeApiClient = new HanimeApiClient(hanimeConfig);
 const hanimeProxy = createImageProxyMiddleware(hanimeConfig, hanimeApiClient);
 
 // Use wildcard to capture EVERYTHING and parse manually to avoid Express param issues with hyphens/colons
-app.use('/hanime-proxy/proxy/image/*', (req, res, next) => {
-    const fullPath = req.params[0]; // This captures everything after 'image/'
+app.use(/^\/hanime-proxy\/proxy\/image\/(.*)/, (req, res, next) => {
+    const fullPath = req.params[0] || ''; // Capture group 1
     const parts = fullPath.split('/');
 
     if (parts.length >= 2) {
@@ -2501,13 +2501,9 @@ app.get('/api/local-status', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Antigravity Core v4.0 is online!`);
-    console.log(`📡 Local Access: http://localhost:${PORT}`);
-    console.log(`🌍 Network Access: http://${getLocalIp()}:${PORT}`);
+    console.log(`📡 Listening on: 0.0.0.0:${PORT}`);
     console.log(`📁 Download Path: ${downloadsDir}`);
     console.log(`⭐ Favorites Cache: ${cachedFavs.length} items loaded`);
     console.log(`🔥 Media Server: ${MEDIA_SERVER_URL} (direct link)`);
     console.log(`--------------------------------------------------\n`);
-}); console.log(`⭐ Favorites Cache: ${cachedFavs.length} items loaded`);
-console.log(`🔥 Media Server: ${MEDIA_SERVER_URL} (direct link)`);
-console.log(`--------------------------------------------------\n`);
-;
+});
